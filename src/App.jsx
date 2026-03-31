@@ -726,6 +726,18 @@ function App() {
     : ''
   const isToday = selectedDate === toDateKey(new Date())
   const nowHour = isToday ? new Date().getHours() : null
+  const visibleHours = useMemo(() => {
+    const hours = new Set()
+    timelineEvents.forEach((event) => {
+      hours.add(new Date(event.created_at).getHours())
+    })
+    if (isToday && nowHour !== null) {
+      hours.add(nowHour)
+    }
+    return Array.from(hours).sort((a, b) => a - b)
+  }, [timelineEvents, isToday, nowHour])
+  const timelineRangeLabel =
+    visibleHours.length >= 24 ? '24 uur' : 'Uren met logs'
 
   return (
     <div className="min-h-screen">
@@ -911,7 +923,7 @@ function App() {
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div
-              className={`app-card space-y-4 p-5 ${
+              className={`app-card space-y-3 p-4 sm:space-y-4 sm:p-5 ${
                 mobileTab === 'tijdlijn' ? '' : 'hidden md:block'
               }`}
             >
@@ -929,37 +941,37 @@ function App() {
                   Geen logs op deze dag. Tijd voor een wandeling?
                 </p>
               ) : (
-                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-4">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-amber-600">
-                    <span>24 uur</span>
+                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-2 sm:p-3 md:p-4">
+                  <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-amber-600 sm:text-xs sm:tracking-[0.25em]">
+                    <span>{timelineRangeLabel}</span>
                     <span>Tik om te bewerken</span>
                   </div>
-                  <div className="mt-4 space-y-4">
-                    <div className="grid grid-cols-[52px_1fr] gap-3 text-xs uppercase tracking-[0.25em] text-amber-600 md:grid-cols-[72px_1fr] md:gap-4">
+                  <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
+                    <div className="grid grid-cols-[44px_1fr] gap-2 text-[10px] uppercase tracking-[0.18em] text-amber-600 sm:grid-cols-[52px_1fr] sm:gap-3 sm:text-xs sm:tracking-[0.25em] md:grid-cols-[72px_1fr] md:gap-4">
                       <span></span>
-                      <div className="grid grid-cols-2 gap-3 md:gap-4">
+                      <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 md:gap-4">
                         <span>Babs</span>
                         <span>Moos</span>
                       </div>
                     </div>
-                    {Array.from({ length: 24 }).map((_, hour) => {
+                    {visibleHours.map((hour) => {
                       const isNow = nowHour === hour
                       return (
                         <div
                           key={`hour-row-${hour}`}
-                          className={`grid grid-cols-[52px_1fr] gap-3 rounded-2xl px-2 py-3 md:grid-cols-[72px_1fr] md:gap-4 ${
+                          className={`grid min-w-0 grid-cols-[44px_1fr] gap-2 rounded-2xl px-2 py-2 sm:grid-cols-[52px_1fr] sm:gap-3 sm:py-2.5 md:grid-cols-[72px_1fr] md:gap-4 md:py-3 ${
                             isNow ? 'bg-amber-100/70' : ''
                           }`}
                         >
-                          <div className="text-xs font-semibold text-amber-700">
+                          <div className="text-[11px] font-semibold leading-tight text-amber-700 sm:text-xs">
                             {String(hour).padStart(2, '0')}:00
                             {isNow ? (
-                              <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white">
+                              <span className="ml-2 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.2em] text-white sm:text-[10px]">
                                 Nu
                               </span>
                             ) : null}
                           </div>
-                          <div className="grid grid-cols-2 gap-3 md:gap-4">
+                          <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 md:gap-4">
                             {DOGS.map((dog) => {
                               const events = timelineEvents
                                 .filter((event) => event.dog === dog)
@@ -970,15 +982,15 @@ function App() {
                               return (
                                 <div
                                   key={`${dog}-${hour}`}
-                                  className="relative rounded-2xl border border-amber-100 bg-amber-50/60 px-3 py-2"
+                                  className="relative min-w-0 rounded-2xl border border-amber-100 bg-amber-50/60 px-2 py-1.5 sm:px-3 sm:py-2"
                                 >
-                                  <div className="absolute left-2 top-2 bottom-2 w-1 rounded-full bg-amber-200"></div>
-                                  <div className="space-y-2 pl-5">
-                                    <p className="text-[10px] uppercase tracking-[0.2em] text-amber-500 md:hidden">
+                                  <div className="absolute left-1.5 top-1.5 bottom-1.5 w-0.5 rounded-full bg-amber-200 sm:left-2 sm:top-2 sm:bottom-2 sm:w-1"></div>
+                                  <div className="space-y-1.5 pl-4 sm:space-y-2 sm:pl-5">
+                                    <p className="text-[9px] uppercase tracking-[0.2em] text-amber-500 md:hidden">
                                       {dog}
                                     </p>
                                     {events.length === 0 ? (
-                                      <div className="h-6 rounded-xl border border-dashed border-amber-200/60 bg-white/70"></div>
+                                      <div className="h-3 rounded-full border border-dashed border-amber-200/60 bg-white/70"></div>
                                     ) : (
                                       events.map((event) => {
                                         const typeLabel =
@@ -1003,28 +1015,30 @@ function App() {
                                             key={event.id}
                                             type="button"
                                             onClick={() => openEditSheet(event)}
-                                            className="w-full rounded-2xl border border-amber-200/70 bg-white/95 px-3 py-2 text-left shadow-sm"
+                                            className="w-full min-w-0 rounded-2xl border border-amber-200/70 bg-white/95 px-2 py-1.5 text-left shadow-sm sm:px-3 sm:py-2"
                                           >
-                                            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-amber-600">
+                                            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-amber-600 sm:text-xs sm:tracking-[0.2em]">
                                               <span>{formatTimeInput(event.created_at)}</span>
                                               <span
-                                                className={`h-3 w-3 rounded-full ${color}`}
+                                                className={`h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3 ${color}`}
                                               ></span>
-                                              <span className="chip">{typeLabel}</span>
+                                              <span className="chip px-2 py-1 text-[9px] sm:text-[10px]">
+                                                {typeLabel}
+                                              </span>
                                             </div>
                                             {showDetails ? (
-                                              <p className="mt-2 text-sm text-amber-900">
+                                              <p className="mt-1.5 text-[11px] leading-snug text-amber-900 sm:mt-2 sm:text-sm">
                                                 {details}
                                               </p>
                                             ) : null}
                                             {photos.length > 0 ? (
-                                              <div className="mt-2 flex flex-wrap gap-2">
+                                              <div className="mt-1.5 flex flex-wrap gap-2 sm:mt-2">
                                                 {photos.map((photo) => (
                                                   <img
                                                     key={photo.url}
                                                     src={photo.url}
                                                     alt="Log foto"
-                                                    className="h-10 w-10 rounded-2xl object-cover"
+                                                    className="h-8 w-8 rounded-2xl object-cover sm:h-10 sm:w-10"
                                                   />
                                                 ))}
                                               </div>
