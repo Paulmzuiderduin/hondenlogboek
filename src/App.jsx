@@ -340,15 +340,6 @@ function App() {
     )
   }, [filteredEvents])
 
-  const timelineByHour = useMemo(() => {
-    const buckets = Array.from({ length: 24 }, () => [])
-    timelineEvents.forEach((event) => {
-      const hour = new Date(event.created_at).getHours()
-      buckets[hour].push(event)
-    })
-    return buckets
-  }, [timelineEvents])
-
   const weeklySummary = useMemo(() => {
     const start = new Date()
     start.setHours(0, 0, 0, 0)
@@ -931,62 +922,75 @@ function App() {
                   <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-4 md:hidden">
                     <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-amber-600">
                       <span>24 uur</span>
-                      <span>Tik om te bewerken</span>
+                      <span>Swipe per hond</span>
                     </div>
-                    <div className="mt-4 space-y-4">
-                      {timelineByHour.map((events, hour) => (
-                        <div key={hour} className="grid grid-cols-[48px_1fr] gap-3">
-                          <div className="text-xs font-semibold text-amber-700">
-                            {String(hour).padStart(2, '0')}:00
+                    <div className="mt-4 space-y-5">
+                      {DOGS.map((dog) => (
+                        <div key={dog} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-amber-900">
+                              {dog}
+                            </h3>
+                            <span className="chip">Tijdlijn</span>
                           </div>
-                          <div className="space-y-2">
-                            {events.length === 0 ? (
-                              <div className="h-9 rounded-2xl border border-dashed border-amber-100 bg-amber-50/50"></div>
-                            ) : (
-                              events.map((event) => {
+                          <div className="overflow-x-auto pb-2">
+                            <div className="relative h-24 min-w-[720px] rounded-2xl border border-amber-100 bg-amber-50/60">
+                              {Array.from({ length: 25 }).map((_, hour) => (
+                                <div
+                                  key={`${dog}-mobile-${hour}`}
+                                  className="absolute top-0 h-full border-l border-amber-100/80"
+                                  style={{ left: `${(hour / 24) * 100}%` }}
+                                >
+                                  {hour < 24 ? (
+                                    <span className="absolute -bottom-5 left-[-6px] text-[10px] font-semibold text-amber-400">
+                                      {String(hour).padStart(2, '0')}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ))}
+                              {timelineEvents
+                                .filter((event) => event.dog === dog)
+                                .map((event) => {
+                                  const minutes = toMinutes(event.created_at)
+                                  const left = (minutes / 1440) * 100
+                                  const typeLabel =
+                                    EVENT_TYPE_LABELS[event.type] || event.type
+                                  const details = formatEventDetails(event)
+                                  const title = `${event.dog} · ${typeLabel} · ${details}`
+                                  return (
+                                    <button
+                                      key={event.id}
+                                      type="button"
+                                      title={title}
+                                      onClick={() => openEditSheet(event)}
+                                      className="absolute top-0 h-full w-4 -translate-x-1/2"
+                                      style={{ left: `${left}%` }}
+                                    >
+                                      <span className="absolute top-0 left-1/2 h-full w-px -translate-x-1/2 bg-amber-300"></span>
+                                      <span className="absolute top-9 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-amber-600 shadow"></span>
+                                    </button>
+                                  )
+                                })}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {timelineEvents
+                              .filter((event) => event.dog === dog)
+                              .map((event) => {
                                 const typeLabel =
                                   EVENT_TYPE_LABELS[event.type] || event.type
-                                const details = formatEventDetails(event)
-                                const photos = normalizePhotos(
-                                  event.data?.photos,
-                                  event.type === 'poep' ? 'poep' : 'welzijn',
-                                )
-                                const showDetails =
-                                  details &&
-                                  details.trim().toLowerCase() !==
-                                    typeLabel.trim().toLowerCase()
+                                const timeLabel = formatTimeInput(event.created_at)
                                 return (
                                   <button
-                                    key={event.id}
+                                    key={`${event.id}-chip`}
                                     type="button"
                                     onClick={() => openEditSheet(event)}
-                                    className="w-full rounded-2xl border border-amber-200/70 bg-white/90 px-3 py-2 text-left shadow-sm"
+                                    className="btn btn-ghost px-3 py-2 text-xs"
                                   >
-                                    <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-amber-600">
-                                      <span>{event.dog}</span>
-                                      <span className="chip">{typeLabel}</span>
-                                    </div>
-                                    {showDetails ? (
-                                      <p className="mt-2 text-sm text-amber-900">
-                                        {details}
-                                      </p>
-                                    ) : null}
-                                    {photos.length > 0 ? (
-                                      <div className="mt-2 flex flex-wrap gap-2">
-                                        {photos.map((photo) => (
-                                          <img
-                                            key={photo.url}
-                                            src={photo.url}
-                                            alt="Log foto"
-                                            className="h-12 w-12 rounded-2xl object-cover"
-                                          />
-                                        ))}
-                                      </div>
-                                    ) : null}
+                                    {timeLabel} · {typeLabel}
                                   </button>
                                 )
-                              })
-                            )}
+                              })}
                           </div>
                         </div>
                       ))}
