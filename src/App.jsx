@@ -34,6 +34,21 @@ const toDateKey = (value) => {
   return `${year}-${month}-${day}`
 }
 
+const formatTimeInput = (value) => {
+  const date = new Date(value)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+const buildTimestamp = (dateKey, timeValue) => {
+  if (!dateKey || !timeValue) return undefined
+  const [hours, minutes] = timeValue.split(':').map(Number)
+  const date = new Date(`${dateKey}T00:00:00`)
+  date.setHours(hours, minutes, 0, 0)
+  return date.toISOString()
+}
+
 const formatTime = (value) =>
   new Date(value).toLocaleTimeString('nl-NL', {
     hour: '2-digit',
@@ -79,6 +94,8 @@ const emptySheetState = {
   eventId: null,
   dog: null,
   type: null,
+  date: '',
+  time: '',
   data: {},
   error: '',
 }
@@ -252,6 +269,12 @@ function App() {
     })
   }, [events, activeDog, activeType, selectedDate])
 
+  const timelineEvents = useMemo(() => {
+    return [...filteredEvents].sort(
+      (a, b) => new Date(a.created_at) - new Date(b.created_at),
+    )
+  }, [filteredEvents])
+
   const weeklySummary = useMemo(() => {
     const start = new Date()
     start.setHours(0, 0, 0, 0)
@@ -286,6 +309,8 @@ function App() {
         eventId: null,
         dog,
         type,
+        date: '',
+        time: '',
         data: { consistency: '', size: '' },
         error: '',
       })
@@ -299,6 +324,8 @@ function App() {
         eventId: null,
         dog,
         type,
+        date: '',
+        time: '',
         data: { meal_type: 'brokken', additives: [] },
         error: '',
       })
@@ -312,6 +339,8 @@ function App() {
         eventId: null,
         dog,
         type,
+        date: '',
+        time: '',
         data: { severity: 'middel', note: '' },
         error: '',
       })
@@ -324,6 +353,8 @@ function App() {
       eventId: null,
       dog,
       type,
+      date: '',
+      time: '',
       data: {},
       error: '',
     })
@@ -342,6 +373,8 @@ function App() {
         eventId: event.id,
         dog: event.dog,
         type: event.type,
+        date: toDateKey(event.created_at),
+        time: formatTimeInput(event.created_at),
         data: {
           consistency: data.consistency || '',
           size: data.size || '',
@@ -364,6 +397,8 @@ function App() {
         eventId: event.id,
         dog: event.dog,
         type: event.type,
+        date: toDateKey(event.created_at),
+        time: formatTimeInput(event.created_at),
         data: {
           meal_type: mealType,
           additives,
@@ -380,6 +415,8 @@ function App() {
         eventId: event.id,
         dog: event.dog,
         type: event.type,
+        date: toDateKey(event.created_at),
+        time: formatTimeInput(event.created_at),
         data: {
           severity: data.severity || 'middel',
           note: data.note || '',
@@ -396,6 +433,8 @@ function App() {
         eventId: event.id,
         dog: event.dog,
         type: event.type,
+        date: toDateKey(event.created_at),
+        time: formatTimeInput(event.created_at),
         data: { training_type: data.training_type || '' },
         error: '',
       })
@@ -409,6 +448,8 @@ function App() {
         eventId: event.id,
         dog: event.dog,
         type: event.type,
+        date: toDateKey(event.created_at),
+        time: formatTimeInput(event.created_at),
         data: { care_action: data.care_action || '' },
         error: '',
       })
@@ -421,6 +462,8 @@ function App() {
       eventId: event.id,
       dog: event.dog,
       type: event.type,
+      date: toDateKey(event.created_at),
+      time: formatTimeInput(event.created_at),
       data,
       error: '',
     })
@@ -453,7 +496,7 @@ function App() {
     setSaving(false)
   }
 
-  const handleUpdateEvent = async ({ id, dog, type, data }) => {
+  const handleUpdateEvent = async ({ id, dog, type, data, created_at }) => {
     if (!supabase) {
       return
     }
@@ -461,9 +504,14 @@ function App() {
     setSaving(true)
     setError('')
 
+    const updatePayload = { dog, type, data }
+    if (created_at) {
+      updatePayload.created_at = created_at
+    }
+
     const { data: updated, error: updateError } = await supabase
       .from('events')
-      .update({ dog, type, data })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single()
@@ -587,6 +635,10 @@ function App() {
 
   const activeSummaryDate = formatLongDate(`${selectedDate}T12:00:00`)
   const isEdit = sheet.mode === 'edit'
+  const editedTimestamp = isEdit ? buildTimestamp(sheet.date, sheet.time) : undefined
+  const editDateLabel = sheet.date
+    ? formatLongDate(`${sheet.date}T12:00:00`)
+    : ''
 
   return (
     <div className="min-h-screen">
@@ -720,7 +772,7 @@ function App() {
 
             <div
               className={`app-card space-y-5 p-5 ${
-                mobileTab === 'daglijn' ? '' : 'hidden md:block'
+                mobileTab === 'tijdlijn' ? '' : 'hidden md:block'
               }`}
             >
               <div>
@@ -789,12 +841,12 @@ function App() {
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div
               className={`app-card space-y-4 p-5 ${
-                mobileTab === 'daglijn' ? '' : 'hidden md:block'
+                mobileTab === 'tijdlijn' ? '' : 'hidden md:block'
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-2xl font-semibold">Daglijn</h2>
+                  <h2 className="text-2xl font-semibold">Tijdlijn</h2>
                   <p className="mt-1 text-sm text-amber-800">{activeSummaryDate}</p>
                 </div>
                 <span className="chip">
@@ -803,46 +855,54 @@ function App() {
               </div>
               {loading ? (
                 <p className="text-sm text-amber-700">Bezig met laden...</p>
-              ) : filteredEvents.length === 0 ? (
+              ) : timelineEvents.length === 0 ? (
                 <p className="text-sm text-amber-700">
                   Geen logs op deze dag. Tijd voor een wandeling?
                 </p>
               ) : (
-                <div className="space-y-3">
-                  {filteredEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="rounded-3xl border border-amber-200/70 bg-white/80 p-4"
-                    >
-                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-amber-600">
-                        <span>{event.dog}</span>
-                        <span>{formatTime(event.created_at)}</span>
+                <div className="relative mt-4">
+                  <div className="absolute left-[80px] top-2 bottom-2 w-px bg-amber-200"></div>
+                  <div className="space-y-6">
+                    {timelineEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        className="grid grid-cols-[64px_1fr] gap-4"
+                      >
+                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                          {formatTime(event.created_at)}
+                        </div>
+                        <div className="relative">
+                          <span className="absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-white bg-amber-500 shadow"></span>
+                          <div className="rounded-3xl border border-amber-200/70 bg-white/80 p-4">
+                            <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.25em] text-amber-600">
+                              <span>{event.dog}</span>
+                              <span className="chip">
+                                {EVENT_TYPE_LABELS[event.type] || event.type}
+                              </span>
+                            </div>
+                            <p className="mt-3 text-sm text-amber-900">
+                              {formatEventDetails(event)}
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                className="btn btn-ghost px-3 py-2 text-xs"
+                                onClick={() => openEditSheet(event)}
+                              >
+                                Bewerken
+                              </button>
+                              <button
+                                className="btn btn-ghost px-3 py-2 text-xs"
+                                onClick={() => handleDeleteEvent(event.id)}
+                                disabled={saving}
+                              >
+                                Verwijderen
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <span className="chip">
-                          {EVENT_TYPE_LABELS[event.type] || event.type}
-                        </span>
-                        <span className="text-sm text-amber-900">
-                          {formatEventDetails(event)}
-                        </span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          className="btn btn-ghost px-3 py-2 text-xs"
-                          onClick={() => openEditSheet(event)}
-                        >
-                          Bewerken
-                        </button>
-                        <button
-                          className="btn btn-ghost px-3 py-2 text-xs"
-                          onClick={() => handleDeleteEvent(event.id)}
-                          disabled={saving}
-                        >
-                          Verwijderen
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -901,11 +961,11 @@ function App() {
           </button>
           <button
             className={`btn w-full ${
-              mobileTab === 'daglijn' ? 'btn-primary' : 'btn-ghost'
+              mobileTab === 'tijdlijn' ? 'btn-primary' : 'btn-ghost'
             }`}
-            onClick={() => setMobileTab('daglijn')}
+            onClick={() => setMobileTab('tijdlijn')}
           >
-            Daglijn
+            Tijdlijn
           </button>
           <button
             className={`btn w-full ${
@@ -963,6 +1023,25 @@ function App() {
                       {dog}
                     </button>
                   ))}
+                </div>
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">Tijd</p>
+                    <input
+                      className="input mt-2 w-[140px]"
+                      type="time"
+                      value={sheet.time}
+                      onChange={(event) =>
+                        setSheet((prev) => ({
+                          ...prev,
+                          time: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-amber-600">
+                    {editDateLabel}
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -1039,6 +1118,7 @@ function App() {
                       await handleUpdateEvent({
                         id: sheet.eventId,
                         ...payload,
+                        created_at: editedTimestamp,
                       })
                     } else {
                       await handleLogEvent(payload)
@@ -1132,6 +1212,7 @@ function App() {
                       await handleUpdateEvent({
                         id: sheet.eventId,
                         ...payload,
+                        created_at: editedTimestamp,
                       })
                     } else {
                       await handleLogEvent(payload)
@@ -1167,6 +1248,7 @@ function App() {
                             await handleUpdateEvent({
                               id: sheet.eventId,
                               ...payload,
+                              created_at: editedTimestamp,
                             })
                           } else {
                             await handleLogEvent(payload)
@@ -1208,6 +1290,7 @@ function App() {
                         dog: sheet.dog,
                         type: 'training',
                         data: { training_type: sheet.data.training_type },
+                        created_at: editedTimestamp,
                       })
                       closeSheet()
                     }}
@@ -1241,6 +1324,7 @@ function App() {
                             await handleUpdateEvent({
                               id: sheet.eventId,
                               ...payload,
+                              created_at: editedTimestamp,
                             })
                           } else {
                             await handleLogEvent(payload)
@@ -1282,6 +1366,7 @@ function App() {
                         dog: sheet.dog,
                         type: 'verzorging',
                         data: { care_action: sheet.data.care_action },
+                        created_at: editedTimestamp,
                       })
                       closeSheet()
                     }}
@@ -1356,6 +1441,7 @@ function App() {
                       await handleUpdateEvent({
                         id: sheet.eventId,
                         ...payload,
+                        created_at: editedTimestamp,
                       })
                     } else {
                       await handleLogEvent(payload)
@@ -1385,6 +1471,7 @@ function App() {
                       await handleUpdateEvent({
                         id: sheet.eventId,
                         ...payload,
+                        created_at: editedTimestamp,
                       })
                     } else {
                       await handleLogEvent(payload)

@@ -1,6 +1,6 @@
 # Hondenlogboek
 
-Mobiele, realtime logboek-app voor Babs en Moos. Snel loggen met één tik, filters per hond en type, een daglijn en een weekoverzicht.
+Mobiele, realtime logboek-app voor Babs en Moos. Snel loggen met één tik, filters per hond en type, een tijdlijn en een weekoverzicht.
 
 ## Starten
 
@@ -99,7 +99,7 @@ De app seedt automatisch:
 
 ## CSV-export
 
-De knop **“Exporteer CSV (gefilterd)”** gebruikt de huidige filters en daglijn.
+De knop **“Exporteer CSV (gefilterd)”** gebruikt de huidige filters en tijdlijn.
 
 ## PWA
 
