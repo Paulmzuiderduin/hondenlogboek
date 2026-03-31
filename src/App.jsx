@@ -26,6 +26,17 @@ const EVENT_TYPE_COLORS = {
   verzorging: 'bg-rose-500',
   welzijn: 'bg-purple-500',
 }
+const POOP_CONSISTENCY_COLORS = {
+  goed: 'bg-emerald-500',
+  zacht: 'bg-amber-400',
+  diarree: 'bg-rose-500',
+  anders: 'bg-slate-400',
+}
+const WELLBEING_SEVERITY_COLORS = {
+  laag: 'bg-emerald-500',
+  middel: 'bg-amber-400',
+  hoog: 'bg-rose-500',
+}
 
 const POOP_CONSISTENCY = ['goed', 'zacht', 'diarree', 'anders']
 const POOP_SIZE = ['klein', 'medium', 'groot']
@@ -349,26 +360,89 @@ function App() {
     )
   }, [filteredEvents])
 
-  const weeklySummary = useMemo(() => {
-    const start = new Date()
-    start.setHours(0, 0, 0, 0)
-    start.setDate(start.getDate() - 6)
+  const weeklyTrends = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const days = Array.from({ length: 7 }).map((_, index) => {
+      const date = new Date(today)
+      date.setDate(date.getDate() - (6 - index))
+      return {
+        key: toDateKey(date),
+        label: date.toLocaleDateString('nl-NL', {
+          weekday: 'short',
+          day: 'numeric',
+        }),
+        full: date.toLocaleDateString('nl-NL', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        }),
+      }
+    })
 
-    return DOGS.map((dog) => {
-      const counts = EVENT_TYPES.reduce((acc, type) => {
-        acc[type.key] = 0
-        return acc
-      }, {})
-
-      events
-        .filter((event) => event.dog === dog)
-        .filter((event) => new Date(event.created_at) >= start)
-        .forEach((event) => {
-          counts[event.type] = (counts[event.type] || 0) + 1
+    return {
+      days,
+      dogs: DOGS.map((dog) => {
+        const dogEvents = events.filter((event) => event.dog === dog)
+        const poop = days.map((day) => {
+          const dayEvents = dogEvents.filter(
+            (event) => event.type === 'poep' && toDateKey(event.created_at) === day.key,
+          )
+          const counts = POOP_CONSISTENCY.reduce((acc, consistency) => {
+            acc[consistency] = 0
+            return acc
+          }, {})
+          dayEvents.forEach((event) => {
+            const value = event.data?.consistency
+            if (value && counts[value] !== undefined) {
+              counts[value] += 1
+            }
+          })
+          const total = dayEvents.length
+          const topConsistency =
+            total === 0
+              ? null
+              : Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+          return { ...day, total, counts, topConsistency }
         })
 
-      return { dog, counts }
-    })
+        const wellbeing = days.map((day) => {
+          const dayEvents = dogEvents.filter(
+            (event) =>
+              event.type === 'welzijn' && toDateKey(event.created_at) === day.key,
+          )
+          const severityValues = dayEvents
+            .map((event) => event.data?.severity)
+            .filter(Boolean)
+          const severityScores = severityValues.map((value) => {
+            if (value === 'hoog') return 3
+            if (value === 'middel') return 2
+            return 1
+          })
+          const avg =
+            severityScores.length > 0
+              ? severityScores.reduce((sum, score) => sum + score, 0) /
+                severityScores.length
+              : null
+          const dominant =
+            severityScores.length === 0
+              ? null
+              : avg >= 2.6
+                ? 'hoog'
+                : avg >= 1.6
+                  ? 'middel'
+                  : 'laag'
+          return {
+            ...day,
+            total: dayEvents.length,
+            avg,
+            dominant,
+          }
+        })
+
+        return { dog, poop, wellbeing }
+      }),
+    }
   }, [events])
 
   const openSheet = (dog, type) => {
@@ -1070,31 +1144,78 @@ function App() {
               <div>
                 <h2 className="text-2xl font-semibold">Weekoverzicht</h2>
                 <p className="mt-1 text-sm text-amber-800">
-                  Laatste 7 dagen inclusief vandaag.
+                  Laatste 7 dagen met focus op poepconsistentie en welzijn.
                 </p>
               </div>
               <div className="space-y-3">
-                {weeklySummary.map((summary) => (
+                {weeklyTrends.dogs.map((dogSummary) => (
                   <div
-                    key={summary.dog}
+                    key={dogSummary.dog}
                     className="rounded-3xl border border-amber-200/70 bg-white/80 p-4"
                   >
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">{summary.dog}</h3>
+                      <h3 className="text-lg font-semibold">{dogSummary.dog}</h3>
                       <span className="chip">7 dagen</span>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                      {EVENT_TYPES.map((type) => (
-                        <div
-                          key={type.key}
-                          className="flex items-center justify-between rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2"
-                        >
-                          <span>{type.label}</span>
-                          <span className="font-semibold text-amber-900">
-                            {summary.counts[type.key] || 0}
-                          </span>
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                          Poepconsistentie
+                        </p>
+                        <div className="mt-3 grid grid-cols-7 gap-2 text-[10px] text-amber-700">
+                          {dogSummary.poop.map((day) => {
+                            const color =
+                              day.topConsistency &&
+                              POOP_CONSISTENCY_COLORS[day.topConsistency]
+                                ? POOP_CONSISTENCY_COLORS[day.topConsistency]
+                                : 'bg-amber-200'
+                            const height =
+                              day.total === 0
+                                ? 6
+                                : Math.min(24, 8 + day.total * 4)
+                            return (
+                              <div key={day.key} className="flex flex-col items-center gap-1">
+                                <div className="flex h-8 items-end">
+                                  <div
+                                    className={`w-3 rounded-full ${color}`}
+                                    style={{ height }}
+                                    title={day.full}
+                                  />
+                                </div>
+                                <span>{day.label}</span>
+                              </div>
+                            )
+                          })}
                         </div>
-                      ))}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                          Welzijn
+                        </p>
+                        <div className="mt-3 grid grid-cols-7 gap-2 text-[10px] text-amber-700">
+                          {dogSummary.wellbeing.map((day) => {
+                            const color =
+                              day.dominant &&
+                              WELLBEING_SEVERITY_COLORS[day.dominant]
+                                ? WELLBEING_SEVERITY_COLORS[day.dominant]
+                                : 'bg-amber-200'
+                            const height =
+                              day.avg === null ? 6 : Math.round(6 + day.avg * 6)
+                            return (
+                              <div key={day.key} className="flex flex-col items-center gap-1">
+                                <div className="flex h-8 items-end">
+                                  <div
+                                    className={`w-3 rounded-full ${color}`}
+                                    style={{ height }}
+                                    title={day.full}
+                                  />
+                                </div>
+                                <span>{day.label}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
