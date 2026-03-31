@@ -90,6 +90,24 @@ alter publication supabase_realtime add table public.training_types;
 alter publication supabase_realtime add table public.care_actions;
 ```
 
+### Foto's (Supabase Storage)
+
+Maak een **public bucket** met de naam `hondenlogboek-photos` en voeg de volgende policies toe:
+
+```
+insert into storage.buckets (id, name, public)
+values ('hondenlogboek-photos', 'hondenlogboek-photos', true)
+on conflict (id) do nothing;
+
+create policy "public read photos"
+on storage.objects for select
+using (bucket_id = 'hondenlogboek-photos');
+
+create policy "public upload photos"
+on storage.objects for insert
+with check (bucket_id = 'hondenlogboek-photos');
+```
+
 ### Defaults
 
 De app seedt automatisch:

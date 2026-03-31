@@ -22,6 +22,8 @@ const POOP_SIZE = ['klein', 'medium', 'groot']
 const MEAL_TYPES = ['brokken', 'rauwvoer', 'prutje']
 const PRUTJE_ADDITIVES = ['probiotica', 'sardineolie', 'psylliumvezels']
 const WELLBEING_LEVELS = ['laag', 'middel', 'hoog']
+const WELLBEING_TAGS = ['niet eten', 'kotsen', 'lusteloos']
+const PHOTO_BUCKET = 'hondenlogboek-photos'
 
 const DEFAULT_CARE_ACTIONS = ['borstelen', 'blazen', 'nagels knippen']
 const DEFAULT_TRAINING_TYPES = ['Algemeen']
@@ -82,6 +84,11 @@ const formatEventDetails = (event) => {
     case 'verzorging':
       return data.care_action || 'Verzorging'
     case 'welzijn':
+      if (Array.isArray(data.tags) && data.tags.length > 0) {
+        return `Signalen: ${data.tags.join(', ')} · ${
+          data.note || 'Korte notitie'
+        }`
+      }
       return `${data.severity || 'middel'} · ${data.note || 'Korte notitie'}`
     default:
       return 'Update'
@@ -115,6 +122,7 @@ function App() {
   const [newTrainingLabel, setNewTrainingLabel] = useState('')
   const [newCareLabel, setNewCareLabel] = useState('')
   const [toasts, setToasts] = useState([])
+  const [photoUploading, setPhotoUploading] = useState(false)
   const configMissing = !isSupabaseConfigured
 
   const upsertEvent = useCallback((record) => {
@@ -137,6 +145,24 @@ function App() {
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id))
     }, 2600)
+  }, [])
+
+  const uploadPhoto = useCallback(async (file, pathPrefix) => {
+    if (!supabase || !file) return null
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
+    const path = `${pathPrefix}/${Date.now()}-${safeName}`
+    const { error: uploadError } = await supabase
+      .storage
+      .from(PHOTO_BUCKET)
+      .upload(path, file, { upsert: false })
+
+    if (uploadError) {
+      setError('Uploaden van de foto mislukte.')
+      return null
+    }
+
+    const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path)
+    return data?.publicUrl || null
   }, [])
 
   useEffect(() => {
@@ -320,7 +346,7 @@ function App() {
         type,
         date: '',
         time: '',
-        data: { consistency: '', size: '' },
+        data: { consistency: '', size: '', photos: [] },
         error: '',
       })
       return
@@ -350,7 +376,7 @@ function App() {
         type,
         date: '',
         time: '',
-        data: { severity: 'middel', note: '' },
+        data: { severity: 'middel', note: '', tags: [], photos: [] },
         error: '',
       })
       return
@@ -387,6 +413,7 @@ function App() {
         data: {
           consistency: data.consistency || '',
           size: data.size || '',
+          photos: Array.isArray(data.photos) ? data.photos : [],
         },
         error: '',
       })
@@ -429,6 +456,8 @@ function App() {
         data: {
           severity: data.severity || 'middel',
           note: data.note || '',
+          tags: Array.isArray(data.tags) ? data.tags : [],
+          photos: Array.isArray(data.photos) ? data.photos : [],
         },
         error: '',
       })
@@ -889,6 +918,9 @@ function App() {
                           const typeLabel =
                             EVENT_TYPE_LABELS[event.type] || event.type
                           const details = formatEventDetails(event)
+                          const photos = Array.isArray(event.data?.photos)
+                            ? event.data.photos
+                            : []
                           const showDetails =
                             details &&
                             details.trim().toLowerCase() !==
@@ -909,6 +941,18 @@ function App() {
                               <p className="mt-3 text-sm text-amber-900">
                                 {details}
                               </p>
+                            ) : null}
+                            {photos.length > 0 ? (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {photos.map((url) => (
+                                  <img
+                                    key={url}
+                                    src={url}
+                                    alt="Log foto"
+                                    className="h-16 w-16 rounded-2xl object-cover"
+                                  />
+                                ))}
+                              </div>
                             ) : null}
                             <div className="mt-3 flex flex-wrap gap-2">
                               <button
@@ -1122,12 +1166,61 @@ function App() {
                     ))}
                   </div>
                 </div>
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">
+                    Foto (optioneel)
+                  </p>
+                  {Array.isArray(sheet.data.photos) &&
+                  sheet.data.photos.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {sheet.data.photos.map((url) => (
+                        <img
+                          key={url}
+                          src={url}
+                          alt="Poep foto"
+                          className="h-16 w-16 rounded-2xl object-cover"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  <input
+                    className="input mt-2"
+                    type="file"
+                    accept="image/*"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0]
+                      if (!file) return
+                      setPhotoUploading(true)
+                      const url = await uploadPhoto(
+                        file,
+                        `poep/${sheet.dog || 'onbekend'}`,
+                      )
+                      if (url) {
+                        setSheet((prev) => ({
+                          ...prev,
+                          data: {
+                            ...prev.data,
+                            photos: [...(prev.data.photos || []), url],
+                          },
+                        }))
+                      }
+                      setPhotoUploading(false)
+                      event.target.value = ''
+                    }}
+                    disabled={photoUploading || configMissing}
+                  />
+                </div>
                 {sheet.error ? (
                   <p className="text-sm text-amber-700">{sheet.error}</p>
                 ) : null}
                 <button
                   className="btn btn-primary w-full"
-                  disabled={!sheet.data.consistency || !sheet.data.size || saving}
+                  disabled={
+                    !sheet.data.consistency ||
+                    !sheet.data.size ||
+                    saving ||
+                    photoUploading
+                  }
                   onClick={async () => {
                     if (!sheet.data.consistency || !sheet.data.size) {
                       setSheet((prev) => ({
@@ -1432,6 +1525,81 @@ function App() {
                   </div>
                 </div>
                 <div>
+                  <p className="text-sm font-semibold text-amber-900">Signalen</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {WELLBEING_TAGS.map((tag) => {
+                      const active = (sheet.data.tags || []).includes(tag)
+                      return (
+                        <button
+                          key={tag}
+                          className={`chip ${active ? 'chip-active' : ''}`}
+                          onClick={() =>
+                            setSheet((prev) => ({
+                              ...prev,
+                              data: {
+                                ...prev.data,
+                                tags: active
+                                  ? prev.data.tags.filter((value) => value !== tag)
+                                  : [...(prev.data.tags || []), tag],
+                              },
+                              error: '',
+                            }))
+                          }
+                        >
+                          {tag}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {(sheet.data.tags || []).includes('kotsen') ||
+                (sheet.data.photos || []).length > 0 ? (
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">
+                      Foto (kotsen)
+                    </p>
+                    {Array.isArray(sheet.data.photos) &&
+                    sheet.data.photos.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {sheet.data.photos.map((url) => (
+                          <img
+                            key={url}
+                            src={url}
+                            alt="Kots foto"
+                            className="h-16 w-16 rounded-2xl object-cover"
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                    <input
+                      className="input mt-2"
+                      type="file"
+                      accept="image/*"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0]
+                        if (!file) return
+                        setPhotoUploading(true)
+                        const url = await uploadPhoto(
+                          file,
+                          `welzijn/${sheet.dog || 'onbekend'}`,
+                        )
+                        if (url) {
+                          setSheet((prev) => ({
+                            ...prev,
+                            data: {
+                              ...prev.data,
+                              photos: [...(prev.data.photos || []), url],
+                            },
+                          }))
+                        }
+                        setPhotoUploading(false)
+                        event.target.value = ''
+                      }}
+                      disabled={photoUploading || configMissing}
+                    />
+                  </div>
+                ) : null}
+                <div>
                   <p className="text-sm font-semibold text-amber-900">Notitie</p>
                   <textarea
                     className="input mt-2 min-h-[90px]"
@@ -1451,6 +1619,7 @@ function App() {
                 ) : null}
                 <button
                   className="btn btn-primary w-full"
+                  disabled={saving || photoUploading}
                   onClick={async () => {
                     if (!sheet.data.note.trim()) {
                       setSheet((prev) => ({
