@@ -68,11 +68,6 @@ const formatLongDate = (value) =>
     month: 'long',
   })
 
-const toMinutes = (value) => {
-  const date = new Date(value)
-  return date.getHours() * 60 + date.getMinutes()
-}
-
 const normalizePhotos = (photos, fallbackTag = '') => {
   if (!Array.isArray(photos)) return []
   return photos
@@ -729,10 +724,8 @@ function App() {
   const editDateLabel = sheet.date
     ? formatLongDate(`${sheet.date}T12:00:00`)
     : ''
-  const nowTop =
-    selectedDate === toDateKey(new Date())
-      ? (toMinutes(new Date()) / 1440) * 100
-      : null
+  const isToday = selectedDate === toDateKey(new Date())
+  const nowHour = isToday ? new Date().getHours() : null
 
   return (
     <div className="min-h-screen">
@@ -941,108 +934,113 @@ function App() {
                     <span>24 uur</span>
                     <span>Tik om te bewerken</span>
                   </div>
-                  <div className="mt-4 grid gap-6 md:grid-cols-[72px_1fr]">
-                    <div className="relative h-[720px] md:h-[900px]">
-                      {Array.from({ length: 25 }).map((_, hour) => (
-                        <div
-                          key={`hour-${hour}`}
-                          className="absolute left-0 right-0 border-t border-amber-200/60"
-                          style={{ top: `${(hour / 24) * 100}%` }}
-                        >
-                          {hour < 24 ? (
-                            <span className="absolute -top-2 left-0 text-xs font-semibold text-amber-400">
-                              {String(hour).padStart(2, '0')}:00
-                            </span>
-                          ) : null}
-                        </div>
-                      ))}
+                  <div className="mt-4 space-y-4">
+                    <div className="hidden md:grid md:grid-cols-[72px_1fr] md:gap-4 text-xs uppercase tracking-[0.25em] text-amber-600">
+                      <span></span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <span>Babs</span>
+                        <span>Moos</span>
+                      </div>
                     </div>
-                    <div className="relative grid gap-4 md:grid-cols-2">
-                      {nowTop !== null ? (
+                    {Array.from({ length: 24 }).map((_, hour) => {
+                      const isNow = nowHour === hour
+                      return (
                         <div
-                          className="pointer-events-none absolute left-0 right-0 z-10 flex items-center gap-2"
-                          style={{ top: `${nowTop}%` }}
+                          key={`hour-row-${hour}`}
+                          className={`grid gap-3 md:grid-cols-[72px_1fr] md:gap-4 rounded-2xl px-2 py-3 ${
+                            isNow ? 'bg-amber-100/70' : ''
+                          }`}
                         >
-                          <span className="rounded-full bg-amber-500 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white shadow">
-                            Nu
-                          </span>
-                          <span className="h-0.5 flex-1 rounded-full bg-amber-400"></span>
-                        </div>
-                      ) : null}
-                      {DOGS.map((dog) => (
-                        <div key={dog} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-amber-900">
-                              {dog}
-                            </h3>
-                            <span className="chip">Tijdlijn</span>
+                          <div className="text-xs font-semibold text-amber-700">
+                            {String(hour).padStart(2, '0')}:00
+                            {isNow ? (
+                              <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white">
+                                Nu
+                              </span>
+                            ) : null}
                           </div>
-                          <div className="relative h-[720px] md:h-[900px] rounded-3xl border border-amber-100 bg-amber-50/60 px-4">
-                            <div className="absolute left-8 top-4 bottom-4 w-2 rounded-full bg-amber-200"></div>
-                            {timelineEvents
-                              .filter((event) => event.dog === dog)
-                              .map((event) => {
-                                const minutes = toMinutes(event.created_at)
-                                const top = (minutes / 1440) * 100
-                                const typeLabel =
-                                  EVENT_TYPE_LABELS[event.type] || event.type
-                                const details = formatEventDetails(event)
-                                const showDetails =
-                                  details &&
-                                  details.trim().toLowerCase() !==
-                                    typeLabel.trim().toLowerCase()
-                                const photos = normalizePhotos(
-                                  event.data?.photos,
-                                  event.type === 'poep' ? 'poep' : 'welzijn',
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {DOGS.map((dog) => {
+                              const events = timelineEvents
+                                .filter((event) => event.dog === dog)
+                                .filter(
+                                  (event) =>
+                                    new Date(event.created_at).getHours() === hour,
                                 )
-                                const color =
-                                  EVENT_TYPE_COLORS[event.type] || 'bg-amber-600'
-                                return (
-                                  <button
-                                    key={event.id}
-                                    type="button"
-                                    onClick={() => openEditSheet(event)}
-                                    className="absolute left-0 w-full pr-4"
-                                    style={{ top: `${top}%` }}
-                                  >
-                                    <div className="relative flex items-start gap-4">
-                                      <div className="flex flex-col items-center">
-                                        <span
-                                          className={`h-5 w-5 rounded-full border-2 border-white shadow ${color}`}
-                                        ></span>
-                                        <span className="mt-1 h-6 w-2 rounded-full bg-amber-300"></span>
-                                      </div>
-                                      <div className="rounded-2xl border border-amber-200/70 bg-white/95 px-3 py-2 text-left shadow-sm">
-                                        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-amber-600">
-                                          <span>{formatTimeInput(event.created_at)}</span>
-                                          <span className="chip">{typeLabel}</span>
-                                        </div>
-                                        {showDetails ? (
-                                          <p className="mt-2 text-sm text-amber-900">
-                                            {details}
-                                          </p>
-                                        ) : null}
-                                        {photos.length > 0 ? (
-                                          <div className="mt-2 flex flex-wrap gap-2">
-                                            {photos.map((photo) => (
-                                              <img
-                                                key={photo.url}
-                                                src={photo.url}
-                                                alt="Log foto"
-                                                className="h-12 w-12 rounded-2xl object-cover"
-                                              />
-                                            ))}
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  </button>
-                                )
-                              })}
+                              return (
+                                <div
+                                  key={`${dog}-${hour}`}
+                                  className="relative rounded-2xl border border-amber-100 bg-amber-50/60 px-3 py-2"
+                                >
+                                  <div className="absolute left-2 top-2 bottom-2 w-1 rounded-full bg-amber-200"></div>
+                                  <div className="space-y-2 pl-5">
+                                    <p className="text-[10px] uppercase tracking-[0.2em] text-amber-500 md:hidden">
+                                      {dog}
+                                    </p>
+                                    {events.length === 0 ? (
+                                      <div className="h-6 rounded-xl border border-dashed border-amber-200/60 bg-white/70"></div>
+                                    ) : (
+                                      events.map((event) => {
+                                        const typeLabel =
+                                          EVENT_TYPE_LABELS[event.type] ||
+                                          event.type
+                                        const details = formatEventDetails(event)
+                                        const showDetails =
+                                          details &&
+                                          details.trim().toLowerCase() !==
+                                            typeLabel.trim().toLowerCase()
+                                        const photos = normalizePhotos(
+                                          event.data?.photos,
+                                          event.type === 'poep'
+                                            ? 'poep'
+                                            : 'welzijn',
+                                        )
+                                        const color =
+                                          EVENT_TYPE_COLORS[event.type] ||
+                                          'bg-amber-600'
+                                        return (
+                                          <button
+                                            key={event.id}
+                                            type="button"
+                                            onClick={() => openEditSheet(event)}
+                                            className="w-full rounded-2xl border border-amber-200/70 bg-white/95 px-3 py-2 text-left shadow-sm"
+                                          >
+                                            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-amber-600">
+                                              <span>{formatTimeInput(event.created_at)}</span>
+                                              <span
+                                                className={`h-3 w-3 rounded-full ${color}`}
+                                              ></span>
+                                              <span className="chip">{typeLabel}</span>
+                                            </div>
+                                            {showDetails ? (
+                                              <p className="mt-2 text-sm text-amber-900">
+                                                {details}
+                                              </p>
+                                            ) : null}
+                                            {photos.length > 0 ? (
+                                              <div className="mt-2 flex flex-wrap gap-2">
+                                                {photos.map((photo) => (
+                                                  <img
+                                                    key={photo.url}
+                                                    src={photo.url}
+                                                    alt="Log foto"
+                                                    className="h-10 w-10 rounded-2xl object-cover"
+                                                  />
+                                                ))}
+                                              </div>
+                                            ) : null}
+                                          </button>
+                                        )
+                                      })
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
