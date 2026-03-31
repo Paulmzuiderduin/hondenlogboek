@@ -50,6 +50,12 @@ const WALK_SLOTS = [
   { key: 'evening', label: 'Avondwandeling', range: '16:01–20:30' },
   { key: 'late', label: 'Late wandeling', range: '20:30–04:00' },
 ]
+const WALK_ACTION_LABELS = {
+  poep: 'Poep',
+  plas: 'Plas',
+  maaltijd: 'Maaltijd',
+  training: 'Training',
+}
 
 const DEFAULT_CARE_ACTIONS = ['borstelen', 'blazen', 'nagels knippen']
 const DEFAULT_TRAINING_TYPES = ['Algemeen']
@@ -1085,6 +1091,11 @@ function App() {
                         <div className="mt-3 grid grid-cols-2 gap-3">
                           {DOGS.map((dog) => {
                             const events = slot.dogs[dog] || []
+                            const grouped = WALK_ACTION_TYPES.map((type) => ({
+                              type,
+                              label: WALK_ACTION_LABELS[type] || type,
+                              events: events.filter((event) => event.type === type),
+                            }))
                             return (
                               <div
                                 key={`${slot.key}-${dog}`}
@@ -1094,57 +1105,82 @@ function App() {
                                   {events.length === 0 ? (
                                     <div className="h-6 rounded-xl border border-dashed border-amber-200/70 bg-white/80" />
                                   ) : (
-                                    events.map((event) => {
-                                      const typeLabel =
-                                        EVENT_TYPE_LABELS[event.type] || event.type
-                                      const details = formatEventDetails(event)
-                                      const showDetails =
-                                        details &&
-                                        details.trim().toLowerCase() !==
-                                          typeLabel.trim().toLowerCase()
-                                      const photos = normalizePhotos(
-                                        event.data?.photos,
-                                        event.type === 'poep'
-                                          ? 'poep'
-                                          : 'welzijn',
-                                      )
+                                    grouped.map((group) => {
                                       const color =
-                                        EVENT_TYPE_COLORS[event.type] ||
+                                        EVENT_TYPE_COLORS[group.type] ||
                                         'bg-amber-600'
                                       return (
-                                        <button
-                                          key={event.id}
-                                          type="button"
-                                          onClick={() => openEditSheet(event)}
-                                          className="w-full rounded-2xl border border-amber-200/70 bg-white/95 px-2 py-2 text-left shadow-sm"
+                                        <div
+                                          key={`${slot.key}-${dog}-${group.type}`}
+                                          className="rounded-2xl border border-amber-200/70 bg-white/95 px-2 py-2 shadow-sm"
                                         >
-                                          <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-amber-600">
-                                            <span>{formatTimeInput(event.created_at)}</span>
-                                            <span
-                                              className={`h-2.5 w-2.5 rounded-full ${color}`}
-                                            ></span>
-                                            <span className="chip px-2 py-1 text-[9px]">
-                                              {typeLabel}
+                                          <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-[0.2em] text-amber-600">
+                                            <div className="flex items-center gap-2">
+                                              <span
+                                                className={`h-2.5 w-2.5 rounded-full ${color}`}
+                                              ></span>
+                                              <span className="chip px-2 py-1 text-[9px]">
+                                                {group.label}
+                                              </span>
+                                            </div>
+                                            <span className="text-[10px] text-amber-700">
+                                              {group.events.length}x
                                             </span>
                                           </div>
-                                          {showDetails ? (
-                                            <p className="mt-2 text-xs text-amber-900 sm:text-sm">
-                                              {details}
+                                          {group.events.length === 0 ? (
+                                            <p className="mt-2 text-[10px] text-amber-500">
+                                              Geen logs.
                                             </p>
-                                          ) : null}
-                                          {photos.length > 0 ? (
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                              {photos.map((photo) => (
-                                                <img
-                                                  key={photo.url}
-                                                  src={photo.url}
-                                                  alt="Log foto"
-                                                  className="h-8 w-8 rounded-2xl object-cover"
-                                                />
-                                              ))}
+                                          ) : (
+                                            <div className="mt-2 space-y-1 text-xs text-amber-900">
+                                              {group.events.map((event) => {
+                                                const details = formatEventDetails(event)
+                                                const showDetails =
+                                                  details &&
+                                                  details.trim().toLowerCase() !==
+                                                    group.label.trim().toLowerCase()
+                                                const photos = normalizePhotos(
+                                                  event.data?.photos,
+                                                  event.type === 'poep'
+                                                    ? 'poep'
+                                                    : 'welzijn',
+                                                )
+                                                return (
+                                                  <div key={event.id} className="space-y-1">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => openEditSheet(event)}
+                                                      className="w-full text-left"
+                                                    >
+                                                      <span className="font-semibold">
+                                                        {formatTimeInput(
+                                                          event.created_at,
+                                                        )}
+                                                      </span>
+                                                      {showDetails ? (
+                                                        <span className="ml-2 text-amber-700">
+                                                          {details}
+                                                        </span>
+                                                      ) : null}
+                                                    </button>
+                                                    {photos.length > 0 ? (
+                                                      <div className="flex flex-wrap gap-2">
+                                                        {photos.map((photo) => (
+                                                          <img
+                                                            key={photo.url}
+                                                            src={photo.url}
+                                                            alt="Log foto"
+                                                            className="h-7 w-7 rounded-2xl object-cover"
+                                                          />
+                                                        ))}
+                                                      </div>
+                                                    ) : null}
+                                                  </div>
+                                                )
+                                              })}
                                             </div>
-                                          ) : null}
-                                        </button>
+                                          )}
+                                        </div>
                                       )
                                     })
                                   )}
