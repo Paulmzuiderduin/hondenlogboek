@@ -885,6 +885,16 @@ function App() {
                         key={event.id}
                         className="grid grid-cols-[64px_1fr] gap-4"
                       >
+                        {(() => {
+                          const typeLabel =
+                            EVENT_TYPE_LABELS[event.type] || event.type
+                          const details = formatEventDetails(event)
+                          const showDetails =
+                            details &&
+                            details.trim().toLowerCase() !==
+                              typeLabel.trim().toLowerCase()
+                          return (
+                            <>
                         <div className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
                           {formatTime(event.created_at)}
                         </div>
@@ -893,13 +903,13 @@ function App() {
                           <div className="rounded-3xl border border-amber-200/70 bg-white/80 p-4">
                             <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.25em] text-amber-600">
                               <span>{event.dog}</span>
-                              <span className="chip">
-                                {EVENT_TYPE_LABELS[event.type] || event.type}
-                              </span>
+                              <span className="chip">{typeLabel}</span>
                             </div>
-                            <p className="mt-3 text-sm text-amber-900">
-                              {formatEventDetails(event)}
-                            </p>
+                            {showDetails ? (
+                              <p className="mt-3 text-sm text-amber-900">
+                                {details}
+                              </p>
+                            ) : null}
                             <div className="mt-3 flex flex-wrap gap-2">
                               <button
                                 className="btn btn-ghost px-3 py-2 text-xs"
@@ -917,6 +927,9 @@ function App() {
                             </div>
                           </div>
                         </div>
+                            </>
+                          )
+                        })()}
                       </div>
                     ))}
                   </div>
