@@ -51,18 +51,17 @@ const buildTimestamp = (dateKey, timeValue) => {
   return date.toISOString()
 }
 
-const formatTime = (value) =>
-  new Date(value).toLocaleTimeString('nl-NL', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
 const formatLongDate = (value) =>
   new Date(value).toLocaleDateString('nl-NL', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
   })
+
+const toMinutes = (value) => {
+  const date = new Date(value)
+  return date.getHours() * 60 + date.getMinutes()
+}
 
 const formatEventDetails = (event) => {
   const data = event.data || {}
@@ -879,9 +878,7 @@ function App() {
                   <h2 className="text-2xl font-semibold">Tijdlijn</h2>
                   <p className="mt-1 text-sm text-amber-800">{activeSummaryDate}</p>
                 </div>
-                <span className="chip">
-                  {filteredEvents.length} meldingen
-                </span>
+                <span className="chip">{timelineEvents.length} meldingen</span>
               </div>
               {loading ? (
                 <p className="text-sm text-amber-700">Bezig met laden...</p>
@@ -890,77 +887,61 @@ function App() {
                   Geen logs op deze dag. Tijd voor een wandeling?
                 </p>
               ) : (
-                <div className="relative mt-4">
-                  <div className="absolute left-[80px] top-2 bottom-2 w-px bg-amber-200"></div>
-                  <div className="space-y-6">
-                    {timelineEvents.map((event) => (
-                      <div
-                        key={event.id}
-                        className="grid grid-cols-[64px_1fr] gap-4"
-                      >
-                        {(() => {
-                          const typeLabel =
-                            EVENT_TYPE_LABELS[event.type] || event.type
-                          const details = formatEventDetails(event)
-                          const photos = Array.isArray(event.data?.photos)
-                            ? event.data.photos
-                            : []
-                          const showDetails =
-                            details &&
-                            details.trim().toLowerCase() !==
-                              typeLabel.trim().toLowerCase()
-                          return (
-                            <>
-                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
-                          {formatTime(event.created_at)}
+                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-4">
+                  <div className="grid grid-cols-[64px_1fr] gap-4 text-xs uppercase tracking-[0.25em] text-amber-600">
+                    <span>Hond</span>
+                    <span>24 uur</span>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {DOGS.map((dog) => (
+                      <div key={dog} className="grid grid-cols-[64px_1fr] gap-4">
+                        <div className="text-xs font-semibold text-amber-700">
+                          {dog}
                         </div>
-                        <div className="relative">
-                          <span className="absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-white bg-amber-500 shadow"></span>
-                          <div className="rounded-3xl border border-amber-200/70 bg-white/80 p-4">
-                            <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.25em] text-amber-600">
-                              <span>{event.dog}</span>
-                              <span className="chip">{typeLabel}</span>
-                            </div>
-                            {showDetails ? (
-                              <p className="mt-3 text-sm text-amber-900">
-                                {details}
-                              </p>
-                            ) : null}
-                            {photos.length > 0 ? (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {photos.map((url) => (
-                                  <img
-                                    key={url}
-                                    src={url}
-                                    alt="Log foto"
-                                    className="h-16 w-16 rounded-2xl object-cover"
-                                  />
-                                ))}
-                              </div>
-                            ) : null}
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <button
-                                className="btn btn-ghost px-3 py-2 text-xs"
-                                onClick={() => openEditSheet(event)}
+                        <div className="relative h-16 rounded-2xl border border-amber-100 bg-amber-50/60">
+                          {Array.from({ length: 24 }).map((_, hour) => (
+                            <div
+                              key={`${dog}-${hour}`}
+                              className="absolute top-0 h-full border-l border-amber-100/80"
+                              style={{ left: `${(hour / 24) * 100}%` }}
+                            >
+                              <span
+                                className="absolute -bottom-5 left-[-6px] text-[10px] font-semibold text-amber-400"
                               >
-                                Bewerken
-                              </button>
-                              <button
-                                className="btn btn-ghost px-3 py-2 text-xs"
-                                onClick={() => handleDeleteEvent(event.id)}
-                                disabled={saving}
-                              >
-                                Verwijderen
-                              </button>
+                                {String(hour).padStart(2, '0')}
+                              </span>
                             </div>
-                          </div>
+                          ))}
+                          {timelineEvents
+                            .filter((event) => event.dog === dog)
+                            .map((event) => {
+                              const minutes = toMinutes(event.created_at)
+                              const left = (minutes / 1440) * 100
+                              const typeLabel =
+                                EVENT_TYPE_LABELS[event.type] || event.type
+                              const details = formatEventDetails(event)
+                              const title = `${event.dog} · ${typeLabel} · ${details}`
+                              return (
+                                <button
+                                  key={event.id}
+                                  type="button"
+                                  title={title}
+                                  onClick={() => openEditSheet(event)}
+                                  className="absolute top-0 h-full w-3 -translate-x-1/2"
+                                  style={{ left: `${left}%` }}
+                                >
+                                  <span className="absolute top-0 left-1/2 h-full w-px -translate-x-1/2 bg-amber-300"></span>
+                                  <span className="absolute top-6 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-white bg-amber-600 shadow"></span>
+                                </button>
+                              )
+                            })}
                         </div>
-                            </>
-                          )
-                        })()}
                       </div>
                     ))}
                   </div>
+                  <p className="mt-4 text-xs text-amber-700">
+                    Tik op een markering om te bewerken.
+                  </p>
                 </div>
               )}
             </div>
@@ -1058,9 +1039,22 @@ function App() {
                     (isEdit ? 'Log wijzigen' : 'Log toevoegen')}
                 </h3>
               </div>
-              <button className="btn btn-ghost" onClick={closeSheet}>
-                Sluiten
-              </button>
+              <div className="flex items-center gap-2">
+                {isEdit ? (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={async () => {
+                      await handleDeleteEvent(sheet.eventId)
+                      closeSheet()
+                    }}
+                  >
+                    Verwijderen
+                  </button>
+                ) : null}
+                <button className="btn btn-ghost" onClick={closeSheet}>
+                  Sluiten
+                </button>
+              </div>
             </div>
 
             {isEdit ? (
