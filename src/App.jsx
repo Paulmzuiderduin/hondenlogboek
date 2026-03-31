@@ -340,6 +340,15 @@ function App() {
     )
   }, [filteredEvents])
 
+  const timelineByHour = useMemo(() => {
+    const buckets = Array.from({ length: 24 }, () => [])
+    timelineEvents.forEach((event) => {
+      const hour = new Date(event.created_at).getHours()
+      buckets[hour].push(event)
+    })
+    return buckets
+  }, [timelineEvents])
+
   const weeklySummary = useMemo(() => {
     const start = new Date()
     start.setHours(0, 0, 0, 0)
@@ -918,62 +927,129 @@ function App() {
                   Geen logs op deze dag. Tijd voor een wandeling?
                 </p>
               ) : (
-                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-4">
-                  <div className="grid grid-cols-[64px_1fr] gap-4 text-xs uppercase tracking-[0.25em] text-amber-600">
-                    <span>Hond</span>
-                    <span>24 uur</span>
-                  </div>
-                  <div className="mt-3 space-y-3">
-                    {DOGS.map((dog) => (
-                      <div key={dog} className="grid grid-cols-[64px_1fr] gap-4">
-                        <div className="text-xs font-semibold text-amber-700">
-                          {dog}
+                <>
+                  <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-4 md:hidden">
+                    <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-amber-600">
+                      <span>24 uur</span>
+                      <span>Tik om te bewerken</span>
+                    </div>
+                    <div className="mt-4 space-y-4">
+                      {timelineByHour.map((events, hour) => (
+                        <div key={hour} className="grid grid-cols-[48px_1fr] gap-3">
+                          <div className="text-xs font-semibold text-amber-700">
+                            {String(hour).padStart(2, '0')}:00
+                          </div>
+                          <div className="space-y-2">
+                            {events.length === 0 ? (
+                              <div className="h-9 rounded-2xl border border-dashed border-amber-100 bg-amber-50/50"></div>
+                            ) : (
+                              events.map((event) => {
+                                const typeLabel =
+                                  EVENT_TYPE_LABELS[event.type] || event.type
+                                const details = formatEventDetails(event)
+                                const photos = normalizePhotos(
+                                  event.data?.photos,
+                                  event.type === 'poep' ? 'poep' : 'welzijn',
+                                )
+                                const showDetails =
+                                  details &&
+                                  details.trim().toLowerCase() !==
+                                    typeLabel.trim().toLowerCase()
+                                return (
+                                  <button
+                                    key={event.id}
+                                    type="button"
+                                    onClick={() => openEditSheet(event)}
+                                    className="w-full rounded-2xl border border-amber-200/70 bg-white/90 px-3 py-2 text-left shadow-sm"
+                                  >
+                                    <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-amber-600">
+                                      <span>{event.dog}</span>
+                                      <span className="chip">{typeLabel}</span>
+                                    </div>
+                                    {showDetails ? (
+                                      <p className="mt-2 text-sm text-amber-900">
+                                        {details}
+                                      </p>
+                                    ) : null}
+                                    {photos.length > 0 ? (
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        {photos.map((photo) => (
+                                          <img
+                                            key={photo.url}
+                                            src={photo.url}
+                                            alt="Log foto"
+                                            className="h-12 w-12 rounded-2xl object-cover"
+                                          />
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </button>
+                                )
+                              })
+                            )}
+                          </div>
                         </div>
-                        <div className="relative h-16 rounded-2xl border border-amber-100 bg-amber-50/60">
-                          {Array.from({ length: 24 }).map((_, hour) => (
-                            <div
-                              key={`${dog}-${hour}`}
-                              className="absolute top-0 h-full border-l border-amber-100/80"
-                              style={{ left: `${(hour / 24) * 100}%` }}
-                            >
-                              <span
-                                className="absolute -bottom-5 left-[-6px] text-[10px] font-semibold text-amber-400"
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 hidden rounded-3xl border border-amber-200/70 bg-white/80 p-4 md:block">
+                    <div className="grid grid-cols-[64px_1fr] gap-4 text-xs uppercase tracking-[0.25em] text-amber-600">
+                      <span>Hond</span>
+                      <span>24 uur</span>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {DOGS.map((dog) => (
+                        <div key={dog} className="grid grid-cols-[64px_1fr] gap-4">
+                          <div className="text-xs font-semibold text-amber-700">
+                            {dog}
+                          </div>
+                          <div className="relative h-20 rounded-2xl border border-amber-100 bg-amber-50/60">
+                            {Array.from({ length: 24 }).map((_, hour) => (
+                              <div
+                                key={`${dog}-${hour}`}
+                                className="absolute top-0 h-full border-l border-amber-100/80"
+                                style={{ left: `${(hour / 24) * 100}%` }}
                               >
-                                {String(hour).padStart(2, '0')}
-                              </span>
-                            </div>
-                          ))}
-                          {timelineEvents
-                            .filter((event) => event.dog === dog)
-                            .map((event) => {
-                              const minutes = toMinutes(event.created_at)
-                              const left = (minutes / 1440) * 100
-                              const typeLabel =
-                                EVENT_TYPE_LABELS[event.type] || event.type
-                              const details = formatEventDetails(event)
-                              const title = `${event.dog} · ${typeLabel} · ${details}`
-                              return (
-                                <button
-                                  key={event.id}
-                                  type="button"
-                                  title={title}
-                                  onClick={() => openEditSheet(event)}
-                                  className="absolute top-0 h-full w-3 -translate-x-1/2"
-                                  style={{ left: `${left}%` }}
+                                <span
+                                  className="absolute -bottom-5 left-[-6px] text-[10px] font-semibold text-amber-400"
                                 >
-                                  <span className="absolute top-0 left-1/2 h-full w-px -translate-x-1/2 bg-amber-300"></span>
-                                  <span className="absolute top-6 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-white bg-amber-600 shadow"></span>
-                                </button>
-                              )
-                            })}
+                                  {String(hour).padStart(2, '0')}
+                                </span>
+                              </div>
+                            ))}
+                            {timelineEvents
+                              .filter((event) => event.dog === dog)
+                              .map((event) => {
+                                const minutes = toMinutes(event.created_at)
+                                const left = (minutes / 1440) * 100
+                                const typeLabel =
+                                  EVENT_TYPE_LABELS[event.type] || event.type
+                                const details = formatEventDetails(event)
+                                const title = `${event.dog} · ${typeLabel} · ${details}`
+                                return (
+                                  <button
+                                    key={event.id}
+                                    type="button"
+                                    title={title}
+                                    onClick={() => openEditSheet(event)}
+                                    className="absolute top-0 h-full w-3 -translate-x-1/2"
+                                    style={{ left: `${left}%` }}
+                                  >
+                                    <span className="absolute top-0 left-1/2 h-full w-px -translate-x-1/2 bg-amber-300"></span>
+                                    <span className="absolute top-8 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-white bg-amber-600 shadow"></span>
+                                  </button>
+                                )
+                              })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <p className="mt-4 text-xs text-amber-700">
+                      Tik op een markering om te bewerken.
+                    </p>
                   </div>
-                  <p className="mt-4 text-xs text-amber-700">
-                    Tik op een markering om te bewerken.
-                  </p>
-                </div>
+                </>
               )}
             </div>
 
