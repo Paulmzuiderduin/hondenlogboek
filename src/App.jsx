@@ -964,11 +964,13 @@ function App() {
                           }`}
                         >
                           <div className="text-[9px] font-semibold leading-tight text-amber-700 sm:text-xs">
-                            {String(hour).padStart(2, '0')}:00
+                            <div>{String(hour).padStart(2, '0')}:00</div>
                             {isNow ? (
-                              <span className="ml-1.5 rounded-full bg-amber-500 px-1 py-0.5 text-[8px] uppercase tracking-[0.2em] text-white sm:text-[10px]">
-                                Nu
-                              </span>
+                              <div>
+                                <span className="mt-1 inline-flex rounded-full bg-amber-500 px-1 py-0.5 text-[8px] uppercase tracking-[0.2em] text-white sm:text-[10px]">
+                                  Nu
+                                </span>
+                              </div>
                             ) : null}
                           </div>
                           <div className="grid min-w-0 grid-cols-2 gap-1 sm:gap-3 md:gap-4">
