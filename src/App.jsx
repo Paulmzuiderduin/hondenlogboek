@@ -63,6 +63,22 @@ const toMinutes = (value) => {
   return date.getHours() * 60 + date.getMinutes()
 }
 
+const normalizePhotos = (photos, fallbackTag = '') => {
+  if (!Array.isArray(photos)) return []
+  return photos
+    .map((photo) => {
+      if (!photo) return null
+      if (typeof photo === 'string') {
+        return { url: photo, tag: fallbackTag }
+      }
+      if (typeof photo === 'object' && photo.url) {
+        return { url: photo.url, tag: photo.tag || fallbackTag }
+      }
+      return null
+    })
+    .filter(Boolean)
+}
+
 const formatEventDetails = (event) => {
   const data = event.data || {}
   switch (event.type) {
@@ -163,6 +179,21 @@ function App() {
     const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path)
     return data?.publicUrl || null
   }, [])
+
+  const uploadPhotos = useCallback(
+    async (files, pathPrefix) => {
+      if (!files?.length) return []
+      const uploaded = []
+      for (const file of files) {
+        const url = await uploadPhoto(file, pathPrefix)
+        if (url) {
+          uploaded.push(url)
+        }
+      }
+      return uploaded
+    },
+    [uploadPhoto],
+  )
 
   useEffect(() => {
     if (!supabase) {
@@ -412,7 +443,7 @@ function App() {
         data: {
           consistency: data.consistency || '',
           size: data.size || '',
-          photos: Array.isArray(data.photos) ? data.photos : [],
+          photos: normalizePhotos(data.photos, 'poep'),
         },
         error: '',
       })
@@ -456,7 +487,7 @@ function App() {
           severity: data.severity || 'middel',
           note: data.note || '',
           tags: Array.isArray(data.tags) ? data.tags : [],
-          photos: Array.isArray(data.photos) ? data.photos : [],
+          photos: normalizePhotos(data.photos, 'welzijn'),
         },
         error: '',
       })
@@ -1151,13 +1182,31 @@ function App() {
                   {Array.isArray(sheet.data.photos) &&
                   sheet.data.photos.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {sheet.data.photos.map((url) => (
-                        <img
-                          key={url}
-                          src={url}
-                          alt="Poep foto"
-                          className="h-16 w-16 rounded-2xl object-cover"
-                        />
+                      {sheet.data.photos.map((photo) => (
+                        <div key={photo.url} className="relative">
+                          <img
+                            src={photo.url}
+                            alt="Poep foto"
+                            className="h-16 w-16 rounded-2xl object-cover"
+                          />
+                          <button
+                            type="button"
+                            className="absolute -right-2 -top-2 h-5 w-5 rounded-full bg-white text-xs font-semibold text-amber-900 shadow"
+                            onClick={() =>
+                              setSheet((prev) => ({
+                                ...prev,
+                                data: {
+                                  ...prev.data,
+                                  photos: prev.data.photos.filter(
+                                    (item) => item.url !== photo.url,
+                                  ),
+                                },
+                              }))
+                            }
+                          >
+                            ×
+                          </button>
+                        </div>
                       ))}
                     </div>
                   ) : null}
@@ -1165,20 +1214,24 @@ function App() {
                     className="input mt-2"
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={async (event) => {
-                      const file = event.target.files?.[0]
-                      if (!file) return
+                      const files = Array.from(event.target.files || [])
+                      if (!files.length) return
                       setPhotoUploading(true)
-                      const url = await uploadPhoto(
-                        file,
+                      const urls = await uploadPhotos(
+                        files,
                         `poep/${sheet.dog || 'onbekend'}`,
                       )
-                      if (url) {
+                      if (urls.length) {
                         setSheet((prev) => ({
                           ...prev,
                           data: {
                             ...prev.data,
-                            photos: [...(prev.data.photos || []), url],
+                            photos: [
+                              ...(prev.data.photos || []),
+                              ...urls.map((url) => ({ url, tag: 'poep' })),
+                            ],
                           },
                         }))
                       }
@@ -1519,6 +1572,11 @@ function App() {
                                 tags: active
                                   ? prev.data.tags.filter((value) => value !== tag)
                                   : [...(prev.data.tags || []), tag],
+                                photos: active
+                                  ? (prev.data.photos || []).filter(
+                                      (photo) => photo.tag !== tag,
+                                    )
+                                  : prev.data.photos || [],
                               },
                               error: '',
                             }))
@@ -1530,51 +1588,83 @@ function App() {
                     })}
                   </div>
                 </div>
-                {(sheet.data.tags || []).includes('kotsen') ||
-                (sheet.data.photos || []).length > 0 ? (
-                  <div>
-                    <p className="text-sm font-semibold text-amber-900">
-                      Foto (kotsen)
-                    </p>
-                    {Array.isArray(sheet.data.photos) &&
-                    sheet.data.photos.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {sheet.data.photos.map((url) => (
-                          <img
-                            key={url}
-                            src={url}
-                            alt="Kots foto"
-                            className="h-16 w-16 rounded-2xl object-cover"
+                {(sheet.data.tags || []).length > 0 ? (
+                  <div className="space-y-3">
+                    {sheet.data.tags.map((tag) => {
+                      const taggedPhotos = (sheet.data.photos || []).filter(
+                        (photo) => photo.tag === tag,
+                      )
+                      return (
+                        <div key={tag}>
+                          <p className="text-sm font-semibold text-amber-900">
+                            Foto ({tag})
+                          </p>
+                          {taggedPhotos.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {taggedPhotos.map((photo) => (
+                                <div key={photo.url} className="relative">
+                                  <img
+                                    src={photo.url}
+                                    alt={`Foto ${tag}`}
+                                    className="h-16 w-16 rounded-2xl object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="absolute -right-2 -top-2 h-5 w-5 rounded-full bg-white text-xs font-semibold text-amber-900 shadow"
+                                    onClick={() =>
+                                      setSheet((prev) => ({
+                                        ...prev,
+                                        data: {
+                                          ...prev.data,
+                                          photos: prev.data.photos.filter(
+                                            (item) => item.url !== photo.url,
+                                          ),
+                                        },
+                                      }))
+                                    }
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          <input
+                            className="input mt-2"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={async (event) => {
+                              const files = Array.from(event.target.files || [])
+                              if (!files.length) return
+                              setPhotoUploading(true)
+                              const urls = await uploadPhotos(
+                                files,
+                                `welzijn/${tag}/${sheet.dog || 'onbekend'}`,
+                              )
+                              if (urls.length) {
+                                setSheet((prev) => ({
+                                  ...prev,
+                                  data: {
+                                    ...prev.data,
+                                    photos: [
+                                      ...(prev.data.photos || []),
+                                      ...urls.map((url) => ({
+                                        url,
+                                        tag,
+                                      })),
+                                    ],
+                                  },
+                                }))
+                              }
+                              setPhotoUploading(false)
+                              event.target.value = ''
+                            }}
+                            disabled={photoUploading || configMissing}
                           />
-                        ))}
-                      </div>
-                    ) : null}
-                    <input
-                      className="input mt-2"
-                      type="file"
-                      accept="image/*"
-                      onChange={async (event) => {
-                        const file = event.target.files?.[0]
-                        if (!file) return
-                        setPhotoUploading(true)
-                        const url = await uploadPhoto(
-                          file,
-                          `welzijn/${sheet.dog || 'onbekend'}`,
-                        )
-                        if (url) {
-                          setSheet((prev) => ({
-                            ...prev,
-                            data: {
-                              ...prev.data,
-                              photos: [...(prev.data.photos || []), url],
-                            },
-                          }))
-                        }
-                        setPhotoUploading(false)
-                        event.target.value = ''
-                      }}
-                      disabled={photoUploading || configMissing}
-                    />
+                        </div>
+                      )
+                    })}
                   </div>
                 ) : null}
                 <div>
