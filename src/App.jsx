@@ -90,10 +90,11 @@ function App() {
   const [activeDog, setActiveDog] = useState('alle')
   const [activeType, setActiveType] = useState('alle')
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()))
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(isSupabaseConfigured)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [sheet, setSheet] = useState(emptySheetState)
+  const [mobileTab, setMobileTab] = useState('loggen')
   const [newTrainingLabel, setNewTrainingLabel] = useState('')
   const [newCareLabel, setNewCareLabel] = useState('')
 
@@ -113,7 +114,6 @@ function App() {
 
   useEffect(() => {
     if (!supabase) {
-      setLoading(false)
       return
     }
 
@@ -594,18 +594,18 @@ function App() {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-28 pt-6 md:pb-16 md:pt-8">
         <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-amber-700">
               Hondenlogboek
             </p>
-            <h1 className="mt-2 text-3xl font-semibold md:text-5xl">Babs & Moos</h1>
-            <p className="mt-2 max-w-lg text-sm text-amber-800">
+            <h1 className="mt-2 text-2xl font-semibold md:text-5xl">Babs & Moos</h1>
+            <p className="mt-2 hidden max-w-lg text-sm text-amber-800 sm:block">
               Snel loggen met één tik, realtime delen en overzicht per dag en week.
             </p>
           </div>
-          <div className="app-card flex flex-col gap-2 px-5 py-4 text-sm">
+          <div className="app-card flex flex-col gap-2 px-4 py-3 text-xs md:px-5 md:py-4 md:text-sm">
             <div className="flex items-center gap-2">
               <span
                 className={`h-2.5 w-2.5 rounded-full ${
@@ -638,69 +638,75 @@ function App() {
 
         <main className="flex flex-col gap-6">
           <section className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
-            <div className="app-card space-y-4 p-5">
+            <div
+              className={`app-card space-y-4 p-4 md:p-5 ${
+                mobileTab === 'loggen' ? '' : 'hidden md:block'
+              }`}
+            >
               <div>
                 <h2 className="text-2xl font-semibold">Snelle log</h2>
-                <p className="mt-1 text-sm text-amber-800">
+                <p className="mt-1 hidden text-sm text-amber-800 md:block">
                   Tik op een knop per hond. Extra details open je in een korte slide.
                 </p>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-4">
                 {DOGS.map((dog) => (
                   <div
                     key={dog}
-                    className="rounded-3xl border border-amber-200/70 bg-amber-50/60 p-4"
+                    className="rounded-3xl border border-amber-200/70 bg-amber-50/60 p-3 md:p-4"
                   >
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs uppercase tracking-[0.3em] text-amber-600">
                           {dog}
                         </p>
-                        <h3 className="mt-1 text-xl font-semibold">Snelle acties</h3>
+                        <h3 className="mt-1 text-base font-semibold md:text-xl">
+                          Snelle acties
+                        </h3>
                       </div>
-                      <span className="chip">1-tik</span>
+                      <span className="chip hidden md:inline-flex">1-tik</span>
                     </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-3 grid grid-cols-2 gap-2 md:mt-4 md:flex md:flex-wrap md:gap-2">
                       <button
-                        className="btn btn-primary"
+                        className="btn btn-primary px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'poep')}
                       >
                         Poep
                       </button>
                       <button
-                        className="btn btn-muted"
+                        className="btn btn-muted px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => logQuick(dog, 'plas')}
                         disabled={saving}
                       >
                         Plas
                       </button>
                       <button
-                        className="btn btn-muted"
+                        className="btn btn-muted px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => logQuick(dog, 'wandeling')}
                         disabled={saving}
                       >
                         Wandeling
                       </button>
                       <button
-                        className="btn btn-ghost"
+                        className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'maaltijd')}
                       >
                         Maaltijd
                       </button>
                       <button
-                        className="btn btn-ghost"
+                        className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'training')}
                       >
                         Training
                       </button>
                       <button
-                        className="btn btn-ghost"
+                        className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'verzorging')}
                       >
                         Verzorging
                       </button>
                       <button
-                        className="btn btn-ghost"
+                        className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'welzijn')}
                       >
                         Welzijn
@@ -711,7 +717,11 @@ function App() {
               </div>
             </div>
 
-            <div className="app-card space-y-5 p-5">
+            <div
+              className={`app-card space-y-5 p-5 ${
+                mobileTab === 'daglijn' ? '' : 'hidden md:block'
+              }`}
+            >
               <div>
                 <h2 className="text-2xl font-semibold">Filters</h2>
                 <p className="mt-1 text-sm text-amber-800">
@@ -776,7 +786,11 @@ function App() {
           </section>
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="app-card space-y-4 p-5">
+            <div
+              className={`app-card space-y-4 p-5 ${
+                mobileTab === 'daglijn' ? '' : 'hidden md:block'
+              }`}
+            >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-2xl font-semibold">Daglijn</h2>
@@ -832,7 +846,11 @@ function App() {
               )}
             </div>
 
-            <div className="app-card space-y-4 p-5">
+            <div
+              className={`app-card space-y-4 p-5 ${
+                mobileTab === 'week' ? '' : 'hidden md:block'
+              }`}
+            >
               <div>
                 <h2 className="text-2xl font-semibold">Weekoverzicht</h2>
                 <p className="mt-1 text-sm text-amber-800">
@@ -869,6 +887,35 @@ function App() {
           </section>
         </main>
       </div>
+
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-amber-200 bg-white/90 px-4 py-2 backdrop-blur md:hidden">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 pb-[env(safe-area-inset-bottom)]">
+          <button
+            className={`btn w-full ${
+              mobileTab === 'loggen' ? 'btn-primary' : 'btn-ghost'
+            }`}
+            onClick={() => setMobileTab('loggen')}
+          >
+            Loggen
+          </button>
+          <button
+            className={`btn w-full ${
+              mobileTab === 'daglijn' ? 'btn-primary' : 'btn-ghost'
+            }`}
+            onClick={() => setMobileTab('daglijn')}
+          >
+            Daglijn
+          </button>
+          <button
+            className={`btn w-full ${
+              mobileTab === 'week' ? 'btn-primary' : 'btn-ghost'
+            }`}
+            onClick={() => setMobileTab('week')}
+          >
+            Week
+          </button>
+        </div>
+      </nav>
 
       {sheet.open ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4">
