@@ -123,6 +123,12 @@ De knop **“Exporteer CSV (gefilterd)”** gebruikt de huidige filters en tijdl
 
 De app bevat een manifest en icons zodat je hem als homescreen app kunt toevoegen.
 
+## Apple Shortcuts (one‑tap logging)
+
+Voor true one‑tap logging via een Supabase Edge Function, zie:
+
+- `docs/shortcuts.md`
+
 ## GitHub Pages deploy
 
 Deze repo bevat een GitHub Actions workflow die de app automatisch deployt naar GitHub Pages.
