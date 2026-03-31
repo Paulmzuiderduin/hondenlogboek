@@ -97,6 +97,7 @@ function App() {
   const [mobileTab, setMobileTab] = useState('loggen')
   const [newTrainingLabel, setNewTrainingLabel] = useState('')
   const [newCareLabel, setNewCareLabel] = useState('')
+  const configMissing = !isSupabaseConfigured
 
   const upsertEvent = useCallback((record) => {
     setEvents((prev) => {
@@ -431,7 +432,6 @@ function App() {
 
   const handleLogEvent = async ({ dog, type, data }) => {
     if (!supabase) {
-      setError('Supabase ontbreekt. Voeg je keys toe in .env.local.')
       return
     }
     if (saving) return
@@ -455,7 +455,6 @@ function App() {
 
   const handleUpdateEvent = async ({ id, dog, type, data }) => {
     if (!supabase) {
-      setError('Supabase ontbreekt. Voeg je keys toe in .env.local.')
       return
     }
     if (saving) return
@@ -480,7 +479,6 @@ function App() {
 
   const handleDeleteEvent = async (eventId) => {
     if (!supabase) {
-      setError('Supabase ontbreekt. Voeg je keys toe in .env.local.')
       return
     }
     const confirmed = window.confirm('Weet je zeker dat je deze log wilt verwijderen?')
@@ -509,7 +507,6 @@ function App() {
 
   const handleAddTraining = async () => {
     if (!supabase) {
-      setSheet((prev) => ({ ...prev, error: 'Supabase ontbreekt.' }))
       return
     }
     const label = newTrainingLabel.trim()
@@ -537,7 +534,6 @@ function App() {
 
   const handleAddCare = async () => {
     if (!supabase) {
-      setSheet((prev) => ({ ...prev, error: 'Supabase ontbreekt.' }))
       return
     }
     const label = newCareLabel.trim()
@@ -630,7 +626,7 @@ function App() {
           </div>
         ) : null}
 
-        {!isSupabaseConfigured ? (
+        {configMissing ? (
           <div className="app-card border-amber-300 bg-white/90 px-4 py-3 text-sm text-amber-900">
             Voeg je Supabase URL en anon key toe in `.env.local` om te starten.
           </div>
@@ -670,44 +666,49 @@ function App() {
                       <button
                         className="btn btn-primary px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'poep')}
+                        disabled={saving || configMissing}
                       >
                         Poep
                       </button>
                       <button
                         className="btn btn-muted px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => logQuick(dog, 'plas')}
-                        disabled={saving}
+                        disabled={saving || configMissing}
                       >
                         Plas
                       </button>
                       <button
                         className="btn btn-muted px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => logQuick(dog, 'wandeling')}
-                        disabled={saving}
+                        disabled={saving || configMissing}
                       >
                         Wandeling
                       </button>
                       <button
                         className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'maaltijd')}
+                        disabled={saving || configMissing}
                       >
                         Maaltijd
                       </button>
                       <button
                         className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'training')}
+                        disabled={saving || configMissing}
                       >
                         Training
                       </button>
                       <button
                         className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'verzorging')}
+                        disabled={saving || configMissing}
                       >
                         Verzorging
                       </button>
                       <button
                         className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'welzijn')}
+                        disabled={saving || configMissing}
                       >
                         Welzijn
                       </button>
