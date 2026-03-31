@@ -17,6 +17,16 @@ const EVENT_TYPE_LABELS = EVENT_TYPES.reduce((acc, item) => {
   return acc
 }, {})
 
+const EVENT_TYPE_COLORS = {
+  poep: 'bg-amber-600',
+  plas: 'bg-sky-500',
+  wandeling: 'bg-emerald-500',
+  maaltijd: 'bg-orange-500',
+  training: 'bg-indigo-500',
+  verzorging: 'bg-rose-500',
+  welzijn: 'bg-purple-500',
+}
+
 const POOP_CONSISTENCY = ['goed', 'zacht', 'diarree', 'anders']
 const POOP_SIZE = ['klein', 'medium', 'groot']
 const MEAL_TYPES = ['brokken', 'rauwvoer', 'prutje']
@@ -918,142 +928,100 @@ function App() {
                   Geen logs op deze dag. Tijd voor een wandeling?
                 </p>
               ) : (
-                <>
-                  <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-4 md:hidden">
-                    <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-amber-600">
-                      <span>24 uur</span>
-                      <span>Swipe per hond</span>
-                    </div>
-                    <div className="mt-4 space-y-5">
-                      {DOGS.map((dog) => (
-                        <div key={dog} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-amber-900">
-                              {dog}
-                            </h3>
-                            <span className="chip">Tijdlijn</span>
-                          </div>
-                          <div className="scroll-lane pb-2">
-                            <div className="relative h-24 min-w-[720px] rounded-2xl border border-amber-100 bg-amber-50/60">
-                              {Array.from({ length: 25 }).map((_, hour) => (
-                                <div
-                                  key={`${dog}-mobile-${hour}`}
-                                  className="absolute top-0 h-full border-l border-amber-100/80"
-                                  style={{ left: `${(hour / 24) * 100}%` }}
-                                >
-                                  {hour < 24 ? (
-                                    <span className="absolute -bottom-5 left-[-6px] text-[10px] font-semibold text-amber-400">
-                                      {String(hour).padStart(2, '0')}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              ))}
-                              {timelineEvents
-                                .filter((event) => event.dog === dog)
-                                .map((event) => {
-                                  const minutes = toMinutes(event.created_at)
-                                  const left = (minutes / 1440) * 100
-                                  const typeLabel =
-                                    EVENT_TYPE_LABELS[event.type] || event.type
-                                  const details = formatEventDetails(event)
-                                  const title = `${event.dog} · ${typeLabel} · ${details}`
-                                  return (
-                                    <button
-                                      key={event.id}
-                                      type="button"
-                                      title={title}
-                                      onClick={() => openEditSheet(event)}
-                                      className="absolute top-0 h-full w-4 -translate-x-1/2"
-                                      style={{ left: `${left}%` }}
-                                    >
-                                      <span className="absolute top-0 left-1/2 h-full w-px -translate-x-1/2 bg-amber-300"></span>
-                                      <span className="absolute top-9 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-amber-600 shadow"></span>
-                                    </button>
-                                  )
-                                })}
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {timelineEvents
-                              .filter((event) => event.dog === dog)
-                              .map((event) => {
-                                const typeLabel =
-                                  EVENT_TYPE_LABELS[event.type] || event.type
-                                const timeLabel = formatTimeInput(event.created_at)
-                                return (
-                                  <button
-                                    key={`${event.id}-chip`}
-                                    type="button"
-                                    onClick={() => openEditSheet(event)}
-                                    className="btn btn-ghost px-3 py-2 text-xs"
-                                  >
-                                    {timeLabel} · {typeLabel}
-                                  </button>
-                                )
-                              })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-4">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-amber-600">
+                    <span>24 uur</span>
+                    <span>Tik om te bewerken</span>
                   </div>
-
-                  <div className="mt-4 hidden rounded-3xl border border-amber-200/70 bg-white/80 p-4 md:block">
-                    <div className="grid grid-cols-[64px_1fr] gap-4 text-xs uppercase tracking-[0.25em] text-amber-600">
-                      <span>Hond</span>
-                      <span>24 uur</span>
-                    </div>
-                    <div className="mt-3 space-y-3">
-                      {DOGS.map((dog) => (
-                        <div key={dog} className="grid grid-cols-[64px_1fr] gap-4">
-                          <div className="text-xs font-semibold text-amber-700">
+                  <div className="mt-4 space-y-6">
+                    {DOGS.map((dog) => (
+                      <div key={dog} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold text-amber-900">
                             {dog}
-                          </div>
-                          <div className="relative h-20 rounded-2xl border border-amber-100 bg-amber-50/60">
-                            {Array.from({ length: 24 }).map((_, hour) => (
-                              <div
-                                key={`${dog}-${hour}`}
-                                className="absolute top-0 h-full border-l border-amber-100/80"
-                                style={{ left: `${(hour / 24) * 100}%` }}
-                              >
-                                <span
-                                  className="absolute -bottom-5 left-[-6px] text-[10px] font-semibold text-amber-400"
-                                >
-                                  {String(hour).padStart(2, '0')}
-                                </span>
-                              </div>
-                            ))}
-                            {timelineEvents
-                              .filter((event) => event.dog === dog)
-                              .map((event) => {
-                                const minutes = toMinutes(event.created_at)
-                                const left = (minutes / 1440) * 100
-                                const typeLabel =
-                                  EVENT_TYPE_LABELS[event.type] || event.type
-                                const details = formatEventDetails(event)
-                                const title = `${event.dog} · ${typeLabel} · ${details}`
-                                return (
-                                  <button
-                                    key={event.id}
-                                    type="button"
-                                    title={title}
-                                    onClick={() => openEditSheet(event)}
-                                    className="absolute top-0 h-full w-3 -translate-x-1/2"
-                                    style={{ left: `${left}%` }}
-                                  >
-                                    <span className="absolute top-0 left-1/2 h-full w-px -translate-x-1/2 bg-amber-300"></span>
-                                    <span className="absolute top-8 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-white bg-amber-600 shadow"></span>
-                                  </button>
-                                )
-                              })}
-                          </div>
+                          </h3>
+                          <span className="chip">Tijdlijn</span>
                         </div>
-                      ))}
-                    </div>
-                    <p className="mt-4 text-xs text-amber-700">
-                      Tik op een markering om te bewerken.
-                    </p>
+                        <div className="relative rounded-3xl border border-amber-100 bg-amber-50/60 px-4 py-4">
+                          <div className="absolute left-8 top-4 bottom-4 w-1 rounded-full bg-amber-200"></div>
+                          {timelineEvents
+                            .filter((event) => event.dog === dog)
+                            .map((event) => {
+                              const minutes = toMinutes(event.created_at)
+                              const top = (minutes / 1440) * 100
+                              const typeLabel =
+                                EVENT_TYPE_LABELS[event.type] || event.type
+                              const details = formatEventDetails(event)
+                              const showDetails =
+                                details &&
+                                details.trim().toLowerCase() !==
+                                  typeLabel.trim().toLowerCase()
+                              const photos = normalizePhotos(
+                                event.data?.photos,
+                                event.type === 'poep' ? 'poep' : 'welzijn',
+                              )
+                              const color =
+                                EVENT_TYPE_COLORS[event.type] || 'bg-amber-600'
+                              return (
+                                <button
+                                  key={event.id}
+                                  type="button"
+                                  onClick={() => openEditSheet(event)}
+                                  className="absolute left-0 w-full pr-4"
+                                  style={{ top: `${top}%` }}
+                                >
+                                  <div className="relative flex items-start gap-4">
+                                    <div className="flex flex-col items-center">
+                                      <span
+                                        className={`h-4 w-4 rounded-full border-2 border-white shadow ${color}`}
+                                      ></span>
+                                      <span className="mt-1 h-4 w-1 rounded-full bg-amber-300"></span>
+                                    </div>
+                                    <div className="rounded-2xl border border-amber-200/70 bg-white/95 px-3 py-2 text-left shadow-sm">
+                                      <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-amber-600">
+                                        <span>{formatTimeInput(event.created_at)}</span>
+                                        <span className="chip">{typeLabel}</span>
+                                      </div>
+                                      {showDetails ? (
+                                        <p className="mt-2 text-sm text-amber-900">
+                                          {details}
+                                        </p>
+                                      ) : null}
+                                      {photos.length > 0 ? (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                          {photos.map((photo) => (
+                                            <img
+                                              key={photo.url}
+                                              src={photo.url}
+                                              alt="Log foto"
+                                              className="h-12 w-12 rounded-2xl object-cover"
+                                            />
+                                          ))}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          {selectedDate === toDateKey(new Date()) ? (
+                            <div
+                              className="absolute left-1 top-0 flex items-center gap-2 text-xs font-semibold text-amber-600"
+                              style={{
+                                top: `${(toMinutes(new Date()) / 1440) * 100}%`,
+                              }}
+                            >
+                              <span className="rounded-full bg-amber-500 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white shadow">
+                                Nu
+                              </span>
+                              <span className="h-4 w-4 rounded-full border-2 border-white bg-amber-500 shadow"></span>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
 
