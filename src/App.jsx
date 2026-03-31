@@ -935,9 +935,9 @@ function App() {
                     <span>Tik om te bewerken</span>
                   </div>
                   <div className="mt-4 space-y-4">
-                    <div className="hidden md:grid md:grid-cols-[72px_1fr] md:gap-4 text-xs uppercase tracking-[0.25em] text-amber-600">
+                    <div className="grid grid-cols-[52px_1fr] gap-3 text-xs uppercase tracking-[0.25em] text-amber-600 md:grid-cols-[72px_1fr] md:gap-4">
                       <span></span>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-3 md:gap-4">
                         <span>Babs</span>
                         <span>Moos</span>
                       </div>
@@ -947,7 +947,7 @@ function App() {
                       return (
                         <div
                           key={`hour-row-${hour}`}
-                          className={`grid gap-3 md:grid-cols-[72px_1fr] md:gap-4 rounded-2xl px-2 py-3 ${
+                          className={`grid grid-cols-[52px_1fr] gap-3 rounded-2xl px-2 py-3 md:grid-cols-[72px_1fr] md:gap-4 ${
                             isNow ? 'bg-amber-100/70' : ''
                           }`}
                         >
@@ -959,7 +959,7 @@ function App() {
                               </span>
                             ) : null}
                           </div>
-                          <div className="grid gap-4 md:grid-cols-2">
+                          <div className="grid grid-cols-2 gap-3 md:gap-4">
                             {DOGS.map((dog) => {
                               const events = timelineEvents
                                 .filter((event) => event.dog === dog)
