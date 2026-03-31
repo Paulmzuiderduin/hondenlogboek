@@ -5,7 +5,6 @@ const DOGS = ['Babs', 'Moos']
 const EVENT_TYPES = [
   { key: 'poep', label: 'Poep' },
   { key: 'plas', label: 'Plas' },
-  { key: 'wandeling', label: 'Wandeling' },
   { key: 'maaltijd', label: 'Maaltijd' },
   { key: 'training', label: 'Training' },
   { key: 'verzorging', label: 'Verzorging' },
@@ -20,7 +19,6 @@ const EVENT_TYPE_LABELS = EVENT_TYPES.reduce((acc, item) => {
 const EVENT_TYPE_COLORS = {
   poep: 'bg-amber-600',
   plas: 'bg-sky-500',
-  wandeling: 'bg-emerald-500',
   maaltijd: 'bg-orange-500',
   training: 'bg-indigo-500',
   verzorging: 'bg-rose-500',
@@ -45,6 +43,13 @@ const PRUTJE_ADDITIVES = ['probiotica', 'sardineolie', 'psylliumvezels']
 const WELLBEING_LEVELS = ['laag', 'middel', 'hoog']
 const WELLBEING_TAGS = ['niet eten', 'kotsen', 'lusteloos']
 const PHOTO_BUCKET = 'hondenlogboek-photos'
+const WALK_ACTION_TYPES = ['poep', 'plas', 'maaltijd', 'training']
+const WALK_SLOTS = [
+  { key: 'morning', label: 'Ochtendwandeling', range: '04:01–12:00' },
+  { key: 'afternoon', label: 'Middagwandeling', range: '12:01–16:00' },
+  { key: 'evening', label: 'Avondwandeling', range: '16:01–20:30' },
+  { key: 'late', label: 'Late wandeling', range: '20:30–04:00' },
+]
 
 const DEFAULT_CARE_ACTIONS = ['borstelen', 'blazen', 'nagels knippen']
 const DEFAULT_TRAINING_TYPES = ['Algemeen']
@@ -70,6 +75,15 @@ const buildTimestamp = (dateKey, timeValue) => {
   const date = new Date(`${dateKey}T00:00:00`)
   date.setHours(hours, minutes, 0, 0)
   return date.toISOString()
+}
+
+const getWalkSlot = (value) => {
+  const date = new Date(value)
+  const minutes = date.getHours() * 60 + date.getMinutes()
+  if (minutes >= 20 * 60 + 30 || minutes <= 4 * 60) return 'late'
+  if (minutes >= 4 * 60 + 1 && minutes <= 12 * 60) return 'morning'
+  if (minutes >= 12 * 60 + 1 && minutes <= 16 * 60) return 'afternoon'
+  return 'evening'
 }
 
 const formatLongDate = (value) =>
@@ -102,8 +116,6 @@ const formatEventDetails = (event) => {
       return `Consistentie: ${data.consistency || '-'} · Grootte: ${data.size || '-'}`
     case 'plas':
       return 'Plas'
-    case 'wandeling':
-      return 'Wandeling'
     case 'maaltijd':
       if (data.meal_type === 'prutje') {
         const additives = (data.additives || []).join(', ')
@@ -799,19 +811,53 @@ function App() {
     ? formatLongDate(`${sheet.date}T12:00:00`)
     : ''
   const isToday = selectedDate === toDateKey(new Date())
-  const nowHour = isToday ? new Date().getHours() : null
-  const visibleHours = useMemo(() => {
-    const hours = new Set()
+  const currentWalkKey = isToday ? getWalkSlot(new Date()) : null
+  const walkTimeline = useMemo(() => {
+    const slotMap = WALK_SLOTS.reduce((acc, slot) => {
+      acc[slot.key] = {
+        ...slot,
+        dogs: DOGS.reduce((dogAcc, dog) => {
+          dogAcc[dog] = []
+          return dogAcc
+        }, {}),
+      }
+      return acc
+    }, {})
+    const general = DOGS.reduce((acc, dog) => {
+      acc[dog] = []
+      return acc
+    }, {})
+
     timelineEvents.forEach((event) => {
-      hours.add(new Date(event.created_at).getHours())
+      if (WALK_ACTION_TYPES.includes(event.type)) {
+        const slotKey = getWalkSlot(event.created_at)
+        const slot = slotMap[slotKey]
+        if (slot && slot.dogs[event.dog]) {
+          slot.dogs[event.dog].push(event)
+        }
+        return
+      }
+      if (general[event.dog]) {
+        general[event.dog].push(event)
+      }
     })
-    if (isToday && nowHour !== null) {
-      hours.add(nowHour)
+
+    Object.values(slotMap).forEach((slot) => {
+      DOGS.forEach((dog) => {
+        slot.dogs[dog].sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at),
+        )
+      })
+    })
+    DOGS.forEach((dog) => {
+      general[dog].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    })
+
+    return {
+      walks: WALK_SLOTS.map((slot) => slotMap[slot.key]),
+      general,
     }
-    return Array.from(hours).sort((a, b) => a - b)
-  }, [timelineEvents, isToday, nowHour])
-  const timelineRangeLabel =
-    visibleHours.length >= 24 ? '24 uur' : 'Uren met logs'
+  }, [timelineEvents])
 
   return (
     <div className="min-h-screen">
@@ -885,13 +931,6 @@ function App() {
                         disabled={saving || configMissing}
                       >
                         Plas
-                      </button>
-                      <button
-                        className="btn btn-muted px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
-                        onClick={() => logQuick(dog, 'wandeling')}
-                        disabled={saving || configMissing}
-                      >
-                        Wandeling
                       </button>
                       <button
                         className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
@@ -1012,125 +1051,191 @@ function App() {
                 <p className="text-sm text-amber-700">Bezig met laden...</p>
               ) : timelineEvents.length === 0 ? (
                 <p className="text-sm text-amber-700">
-                  Geen logs op deze dag. Tijd voor een wandeling?
+                  Geen logs op deze dag.
                 </p>
               ) : (
-                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-1 sm:p-3 md:p-4">
-                  <div className="flex items-center justify-between text-[8.5px] uppercase tracking-[0.12em] text-amber-600 sm:text-xs sm:tracking-[0.25em]">
-                    <span>{timelineRangeLabel}</span>
+                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-3 sm:p-4">
+                  <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-amber-600 sm:text-xs">
+                    <span>4 wandelmomenten</span>
                     <span>Tik om te bewerken</span>
                   </div>
-                  <div className="mt-2 space-y-2 sm:mt-4 sm:space-y-4">
-                    <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-1 text-[8.5px] uppercase tracking-[0.12em] text-amber-600 sm:grid-cols-[52px_1fr] sm:gap-3 sm:text-xs sm:tracking-[0.25em] md:grid-cols-[72px_1fr] md:gap-4">
-                      <span></span>
-                      <div className="grid min-w-0 grid-cols-2 gap-1 sm:gap-3 md:gap-4">
-                        <span>Babs</span>
-                        <span>Moos</span>
+                  <div className="mt-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.2em] text-amber-600 sm:text-xs">
+                      <span>Babs</span>
+                      <span>Moos</span>
+                    </div>
+                    {walkTimeline.walks.map((slot) => (
+                      <div
+                        key={slot.key}
+                        className={`rounded-2xl border border-amber-100 bg-amber-50/60 p-3 ${
+                          currentWalkKey === slot.key ? 'bg-amber-100/70' : ''
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700">
+                              {slot.label}
+                            </p>
+                            <p className="text-[11px] text-amber-600">{slot.range}</p>
+                          </div>
+                          {currentWalkKey === slot.key ? (
+                            <span className="chip px-3 py-1 text-[10px]">Nu</span>
+                          ) : null}
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                          {DOGS.map((dog) => {
+                            const events = slot.dogs[dog] || []
+                            return (
+                              <div
+                                key={`${slot.key}-${dog}`}
+                                className="relative min-w-0 rounded-2xl border border-amber-100 bg-white/70 p-2"
+                              >
+                                <div className="space-y-2">
+                                  {events.length === 0 ? (
+                                    <div className="h-6 rounded-xl border border-dashed border-amber-200/70 bg-white/80" />
+                                  ) : (
+                                    events.map((event) => {
+                                      const typeLabel =
+                                        EVENT_TYPE_LABELS[event.type] || event.type
+                                      const details = formatEventDetails(event)
+                                      const showDetails =
+                                        details &&
+                                        details.trim().toLowerCase() !==
+                                          typeLabel.trim().toLowerCase()
+                                      const photos = normalizePhotos(
+                                        event.data?.photos,
+                                        event.type === 'poep'
+                                          ? 'poep'
+                                          : 'welzijn',
+                                      )
+                                      const color =
+                                        EVENT_TYPE_COLORS[event.type] ||
+                                        'bg-amber-600'
+                                      return (
+                                        <button
+                                          key={event.id}
+                                          type="button"
+                                          onClick={() => openEditSheet(event)}
+                                          className="w-full rounded-2xl border border-amber-200/70 bg-white/95 px-2 py-2 text-left shadow-sm"
+                                        >
+                                          <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-amber-600">
+                                            <span>{formatTimeInput(event.created_at)}</span>
+                                            <span
+                                              className={`h-2.5 w-2.5 rounded-full ${color}`}
+                                            ></span>
+                                            <span className="chip px-2 py-1 text-[9px]">
+                                              {typeLabel}
+                                            </span>
+                                          </div>
+                                          {showDetails ? (
+                                            <p className="mt-2 text-xs text-amber-900 sm:text-sm">
+                                              {details}
+                                            </p>
+                                          ) : null}
+                                          {photos.length > 0 ? (
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                              {photos.map((photo) => (
+                                                <img
+                                                  key={photo.url}
+                                                  src={photo.url}
+                                                  alt="Log foto"
+                                                  className="h-8 w-8 rounded-2xl object-cover"
+                                                />
+                                              ))}
+                                            </div>
+                                          ) : null}
+                                        </button>
+                                      )
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="rounded-2xl border border-amber-100 bg-white/70 p-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700">
+                          Algemeen (dag)
+                        </p>
+                        <p className="text-[11px] text-amber-600">
+                          Verzorging, welzijn en andere notities.
+                        </p>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        {DOGS.map((dog) => {
+                          const events = walkTimeline.general[dog] || []
+                          return (
+                            <div
+                              key={`general-${dog}`}
+                              className="rounded-2xl border border-amber-100 bg-white/80 p-2"
+                            >
+                              <div className="space-y-2">
+                                {events.length === 0 ? (
+                                  <div className="h-6 rounded-xl border border-dashed border-amber-200/70 bg-white/80" />
+                                ) : (
+                                  events.map((event) => {
+                                    const typeLabel =
+                                      EVENT_TYPE_LABELS[event.type] || event.type
+                                    const details = formatEventDetails(event)
+                                    const showDetails =
+                                      details &&
+                                      details.trim().toLowerCase() !==
+                                        typeLabel.trim().toLowerCase()
+                                    const photos = normalizePhotos(
+                                      event.data?.photos,
+                                      event.type === 'poep'
+                                        ? 'poep'
+                                        : 'welzijn',
+                                    )
+                                    const color =
+                                      EVENT_TYPE_COLORS[event.type] ||
+                                      'bg-amber-600'
+                                    return (
+                                      <button
+                                        key={event.id}
+                                        type="button"
+                                        onClick={() => openEditSheet(event)}
+                                        className="w-full rounded-2xl border border-amber-200/70 bg-white/95 px-2 py-2 text-left shadow-sm"
+                                      >
+                                        <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-amber-600">
+                                          <span>{formatTimeInput(event.created_at)}</span>
+                                          <span
+                                            className={`h-2.5 w-2.5 rounded-full ${color}`}
+                                          ></span>
+                                          <span className="chip px-2 py-1 text-[9px]">
+                                            {typeLabel}
+                                          </span>
+                                        </div>
+                                        {showDetails ? (
+                                          <p className="mt-2 text-xs text-amber-900 sm:text-sm">
+                                            {details}
+                                          </p>
+                                        ) : null}
+                                        {photos.length > 0 ? (
+                                          <div className="mt-2 flex flex-wrap gap-2">
+                                            {photos.map((photo) => (
+                                              <img
+                                                key={photo.url}
+                                                src={photo.url}
+                                                alt="Log foto"
+                                                className="h-8 w-8 rounded-2xl object-cover"
+                                              />
+                                            ))}
+                                          </div>
+                                        ) : null}
+                                      </button>
+                                    )
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
-                    {visibleHours.map((hour) => {
-                      const isNow = nowHour === hour
-                      return (
-                        <div
-                          key={`hour-row-${hour}`}
-                          className={`grid min-w-0 grid-cols-[36px_minmax(0,1fr)] gap-1 rounded-2xl px-1 py-1.5 sm:grid-cols-[52px_1fr] sm:gap-3 sm:px-2 sm:py-2.5 md:grid-cols-[72px_1fr] md:gap-4 md:py-3 ${
-                            isNow ? 'bg-amber-100/70' : ''
-                          }`}
-                        >
-                          <div className="text-[9px] font-semibold leading-tight text-amber-700 sm:text-xs">
-                            <div>{String(hour).padStart(2, '0')}:00</div>
-                            {isNow ? (
-                              <div>
-                                <span className="mt-1 inline-flex rounded-full bg-amber-500 px-1 py-0.5 text-[8px] uppercase tracking-[0.2em] text-white sm:text-[10px]">
-                                  Nu
-                                </span>
-                              </div>
-                            ) : null}
-                          </div>
-                          <div className="grid min-w-0 grid-cols-2 gap-1 sm:gap-3 md:gap-4">
-                            {DOGS.map((dog) => {
-                              const events = timelineEvents
-                                .filter((event) => event.dog === dog)
-                                .filter(
-                                  (event) =>
-                                    new Date(event.created_at).getHours() === hour,
-                                )
-                              return (
-                                <div
-                                  key={`${dog}-${hour}`}
-                                  className="relative min-w-0 rounded-2xl border border-amber-100 bg-amber-50/60 px-1 py-1.5 sm:px-3 sm:py-2"
-                                >
-                                  <div className="absolute left-1 top-1 bottom-1 w-0.5 rounded-full bg-amber-200 sm:left-2 sm:top-2 sm:bottom-2 sm:w-1"></div>
-                                  <div className="space-y-1 pl-3 sm:space-y-2 sm:pl-5">
-                                    <p className="text-[9px] uppercase tracking-[0.2em] text-amber-500 md:hidden">
-                                      {dog}
-                                    </p>
-                                    {events.length === 0 ? (
-                                      <div className="h-3 rounded-full border border-dashed border-amber-200/60 bg-white/70"></div>
-                                    ) : (
-                                      events.map((event) => {
-                                        const typeLabel =
-                                          EVENT_TYPE_LABELS[event.type] ||
-                                          event.type
-                                        const details = formatEventDetails(event)
-                                        const showDetails =
-                                          details &&
-                                          details.trim().toLowerCase() !==
-                                            typeLabel.trim().toLowerCase()
-                                        const photos = normalizePhotos(
-                                          event.data?.photos,
-                                          event.type === 'poep'
-                                            ? 'poep'
-                                            : 'welzijn',
-                                        )
-                                        const color =
-                                          EVENT_TYPE_COLORS[event.type] ||
-                                          'bg-amber-600'
-                                        return (
-                                          <button
-                                            key={event.id}
-                                            type="button"
-                                            onClick={() => openEditSheet(event)}
-                                            className="w-full min-w-0 overflow-hidden rounded-2xl border border-amber-200/70 bg-white/95 px-1 py-1.5 text-left shadow-sm sm:px-3 sm:py-2"
-                                          >
-                                            <div className="flex flex-wrap items-center gap-1 text-[9px] uppercase tracking-[0.12em] text-amber-600 sm:gap-2 sm:text-xs sm:tracking-[0.2em]">
-                                              <span>{formatTimeInput(event.created_at)}</span>
-                                              <span
-                                                className={`h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3 ${color}`}
-                                              ></span>
-                                              <span className="chip max-w-full px-1.5 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px]">
-                                                {typeLabel}
-                                              </span>
-                                            </div>
-                                            {showDetails ? (
-                                              <p className="mt-1 text-[9px] leading-snug text-amber-900 sm:mt-2 sm:text-sm">
-                                                {details}
-                                              </p>
-                                            ) : null}
-                                            {photos.length > 0 ? (
-                                              <div className="mt-1 flex flex-wrap gap-1.5 sm:mt-2 sm:gap-2">
-                                                {photos.map((photo) => (
-                                                  <img
-                                                    key={photo.url}
-                                                    src={photo.url}
-                                                    alt="Log foto"
-                                                    className="h-6 w-6 rounded-2xl object-cover sm:h-10 sm:w-10"
-                                                  />
-                                                ))}
-                                              </div>
-                                            ) : null}
-                                          </button>
-                                        )
-                                      })
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )
-                    })}
                   </div>
                 </div>
               )}
@@ -1272,8 +1377,7 @@ function App() {
                     (isEdit ? 'Verzorging wijzigen' : 'Verzorging loggen')}
                   {sheet.type === 'welzijn' &&
                     (isEdit ? 'Welzijn wijzigen' : 'Welzijn loggen')}
-                  {(sheet.type === 'plas' || sheet.type === 'wandeling') &&
-                    (isEdit ? 'Log wijzigen' : 'Log toevoegen')}
+                  {sheet.type === 'plas' && (isEdit ? 'Log wijzigen' : 'Log toevoegen')}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -1930,7 +2034,7 @@ function App() {
               </div>
             ) : null}
 
-            {sheet.type === 'plas' || sheet.type === 'wandeling' ? (
+            {sheet.type === 'plas' ? (
               <div className="space-y-4">
                 <p className="text-sm text-amber-800">
                   Geen extra details voor deze log.
