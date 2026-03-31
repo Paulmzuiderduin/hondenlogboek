@@ -1335,6 +1335,7 @@ function App() {
                       data: {
                         consistency: sheet.data.consistency,
                         size: sheet.data.size,
+                        photos: sheet.data.photos || [],
                       },
                     }
                     if (isEdit) {
@@ -1771,6 +1772,8 @@ function App() {
                       data: {
                         severity: sheet.data.severity,
                         note: sheet.data.note.trim(),
+                        tags: sheet.data.tags || [],
+                        photos: sheet.data.photos || [],
                       },
                     }
                     if (isEdit) {
