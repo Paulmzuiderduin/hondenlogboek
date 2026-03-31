@@ -114,6 +114,7 @@ function App() {
   const [mobileTab, setMobileTab] = useState('loggen')
   const [newTrainingLabel, setNewTrainingLabel] = useState('')
   const [newCareLabel, setNewCareLabel] = useState('')
+  const [toasts, setToasts] = useState([])
   const configMissing = !isSupabaseConfigured
 
   const upsertEvent = useCallback((record) => {
@@ -128,6 +129,14 @@ function App() {
         (a, b) => new Date(b.created_at) - new Date(a.created_at),
       )
     })
+  }, [])
+
+  const addToast = useCallback((message, tone = 'success') => {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+    setToasts((prev) => [...prev, { id, message, tone }])
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id))
+    }, 2600)
   }, [])
 
   useEffect(() => {
@@ -491,6 +500,10 @@ function App() {
       setError('Opslaan mislukte. Probeer het opnieuw.')
     } else if (inserted) {
       upsertEvent(inserted)
+      addToast(
+        `${EVENT_TYPE_LABELS[type] || type} gelogd voor ${dog}.`,
+        'success',
+      )
     }
 
     setSaving(false)
@@ -520,6 +533,7 @@ function App() {
       setError('Bijwerken mislukte. Probeer het opnieuw.')
     } else if (updated) {
       upsertEvent(updated)
+      addToast(`Log bijgewerkt voor ${dog}.`, 'success')
     }
 
     setSaving(false)
@@ -544,6 +558,7 @@ function App() {
       setError('Verwijderen mislukte. Probeer het opnieuw.')
     } else {
       setEvents((prev) => prev.filter((item) => item.id !== eventId))
+      addToast('Log verwijderd.', 'success')
     }
 
     setSaving(false)
@@ -578,6 +593,7 @@ function App() {
     }
     setNewTrainingLabel('')
     setSheet((prev) => ({ ...prev, error: '' }))
+    addToast('Trainingstype toegevoegd.', 'success')
   }
 
   const handleAddCare = async () => {
@@ -603,6 +619,7 @@ function App() {
     }
     setNewCareLabel('')
     setSheet((prev) => ({ ...prev, error: '' }))
+    addToast('Verzorgingsactie toegevoegd.', 'success')
   }
 
   const exportCSV = () => {
@@ -1486,6 +1503,21 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      <div className="pointer-events-none fixed bottom-24 left-1/2 z-50 w-[92%] max-w-sm -translate-x-1/2 space-y-2 md:bottom-6 md:left-auto md:right-6 md:translate-x-0">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`rounded-2xl border px-4 py-3 text-sm shadow ${
+              toast.tone === 'success'
+                ? 'border-emerald-200/80 bg-white/95 text-emerald-900'
+                : 'border-amber-200/80 bg-white/95 text-amber-900'
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
