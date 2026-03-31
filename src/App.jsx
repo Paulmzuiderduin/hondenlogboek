@@ -699,23 +699,7 @@ function App() {
               Snel loggen met één tik, realtime delen en overzicht per dag en week.
             </p>
           </div>
-          <div className="app-card flex flex-col gap-2 px-4 py-3 text-xs md:px-5 md:py-4 md:text-sm">
-            <div className="flex items-center gap-2">
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  isSupabaseConfigured ? 'bg-emerald-500' : 'bg-amber-500'
-                }`}
-              ></span>
-              <span className="font-semibold text-amber-900">
-                {isSupabaseConfigured ? 'Realtime actief' : 'Realtime uit'}
-              </span>
-            </div>
-            <p className="text-xs text-amber-700">
-              {isSupabaseConfigured
-                ? 'Iedere log komt direct bij de ander binnen.'
-                : 'Voeg Supabase keys toe om te delen.'}
-            </p>
-          </div>
+          {null}
         </header>
 
         {error ? (
