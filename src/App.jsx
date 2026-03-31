@@ -941,15 +941,15 @@ function App() {
                   Geen logs op deze dag. Tijd voor een wandeling?
                 </p>
               ) : (
-                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-2 sm:p-3 md:p-4">
-                  <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-amber-600 sm:text-xs sm:tracking-[0.25em]">
+                <div className="mt-4 rounded-3xl border border-amber-200/70 bg-white/80 p-1.5 sm:p-3 md:p-4">
+                  <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.14em] text-amber-600 sm:text-xs sm:tracking-[0.25em]">
                     <span>{timelineRangeLabel}</span>
                     <span>Tik om te bewerken</span>
                   </div>
-                  <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
-                    <div className="grid grid-cols-[44px_1fr] gap-2 text-[10px] uppercase tracking-[0.18em] text-amber-600 sm:grid-cols-[52px_1fr] sm:gap-3 sm:text-xs sm:tracking-[0.25em] md:grid-cols-[72px_1fr] md:gap-4">
+                  <div className="mt-2.5 space-y-2.5 sm:mt-4 sm:space-y-4">
+                    <div className="grid grid-cols-[40px_minmax(0,1fr)] gap-1.5 text-[9px] uppercase tracking-[0.14em] text-amber-600 sm:grid-cols-[52px_1fr] sm:gap-3 sm:text-xs sm:tracking-[0.25em] md:grid-cols-[72px_1fr] md:gap-4">
                       <span></span>
-                      <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+                      <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:gap-3 md:gap-4">
                         <span>Babs</span>
                         <span>Moos</span>
                       </div>
@@ -959,11 +959,11 @@ function App() {
                       return (
                         <div
                           key={`hour-row-${hour}`}
-                          className={`grid min-w-0 grid-cols-[44px_1fr] gap-2 rounded-2xl px-2 py-2 sm:grid-cols-[52px_1fr] sm:gap-3 sm:py-2.5 md:grid-cols-[72px_1fr] md:gap-4 md:py-3 ${
+                          className={`grid min-w-0 grid-cols-[40px_minmax(0,1fr)] gap-1.5 rounded-2xl px-1.5 py-1.5 sm:grid-cols-[52px_1fr] sm:gap-3 sm:px-2 sm:py-2.5 md:grid-cols-[72px_1fr] md:gap-4 md:py-3 ${
                             isNow ? 'bg-amber-100/70' : ''
                           }`}
                         >
-                          <div className="text-[11px] font-semibold leading-tight text-amber-700 sm:text-xs">
+                          <div className="text-[10px] font-semibold leading-tight text-amber-700 sm:text-xs">
                             {String(hour).padStart(2, '0')}:00
                             {isNow ? (
                               <span className="ml-2 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.2em] text-white sm:text-[10px]">
@@ -971,7 +971,7 @@ function App() {
                               </span>
                             ) : null}
                           </div>
-                          <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+                          <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:gap-3 md:gap-4">
                             {DOGS.map((dog) => {
                               const events = timelineEvents
                                 .filter((event) => event.dog === dog)
@@ -982,10 +982,10 @@ function App() {
                               return (
                                 <div
                                   key={`${dog}-${hour}`}
-                                  className="relative min-w-0 rounded-2xl border border-amber-100 bg-amber-50/60 px-2 py-1.5 sm:px-3 sm:py-2"
+                                  className="relative min-w-0 rounded-2xl border border-amber-100 bg-amber-50/60 px-1.5 py-1.5 sm:px-3 sm:py-2"
                                 >
-                                  <div className="absolute left-1.5 top-1.5 bottom-1.5 w-0.5 rounded-full bg-amber-200 sm:left-2 sm:top-2 sm:bottom-2 sm:w-1"></div>
-                                  <div className="space-y-1.5 pl-4 sm:space-y-2 sm:pl-5">
+                                  <div className="absolute left-1 top-1 bottom-1 w-0.5 rounded-full bg-amber-200 sm:left-2 sm:top-2 sm:bottom-2 sm:w-1"></div>
+                                  <div className="space-y-1.5 pl-3.5 sm:space-y-2 sm:pl-5">
                                     <p className="text-[9px] uppercase tracking-[0.2em] text-amber-500 md:hidden">
                                       {dog}
                                     </p>
@@ -1015,30 +1015,30 @@ function App() {
                                             key={event.id}
                                             type="button"
                                             onClick={() => openEditSheet(event)}
-                                            className="w-full min-w-0 rounded-2xl border border-amber-200/70 bg-white/95 px-2 py-1.5 text-left shadow-sm sm:px-3 sm:py-2"
+                                            className="w-full min-w-0 overflow-hidden rounded-2xl border border-amber-200/70 bg-white/95 px-1.5 py-1.5 text-left shadow-sm sm:px-3 sm:py-2"
                                           >
-                                            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-amber-600 sm:text-xs sm:tracking-[0.2em]">
+                                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-amber-600 sm:gap-2 sm:text-xs sm:tracking-[0.2em]">
                                               <span>{formatTimeInput(event.created_at)}</span>
                                               <span
                                                 className={`h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3 ${color}`}
                                               ></span>
-                                              <span className="chip px-2 py-1 text-[9px] sm:text-[10px]">
+                                              <span className="chip max-w-full px-2 py-1 text-[9px] sm:text-[10px]">
                                                 {typeLabel}
                                               </span>
                                             </div>
                                             {showDetails ? (
-                                              <p className="mt-1.5 text-[11px] leading-snug text-amber-900 sm:mt-2 sm:text-sm">
+                                              <p className="mt-1 text-[10px] leading-snug text-amber-900 sm:mt-2 sm:text-sm">
                                                 {details}
                                               </p>
                                             ) : null}
                                             {photos.length > 0 ? (
-                                              <div className="mt-1.5 flex flex-wrap gap-2 sm:mt-2">
+                                              <div className="mt-1 flex flex-wrap gap-2 sm:mt-2">
                                                 {photos.map((photo) => (
                                                   <img
                                                     key={photo.url}
                                                     src={photo.url}
                                                     alt="Log foto"
-                                                    className="h-8 w-8 rounded-2xl object-cover sm:h-10 sm:w-10"
+                                                    className="h-7 w-7 rounded-2xl object-cover sm:h-10 sm:w-10"
                                                   />
                                                 ))}
                                               </div>
