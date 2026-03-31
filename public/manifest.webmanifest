@@ -1,0 +1,28 @@
+{
+  "name": "Hondenlogboek",
+  "short_name": "Logboek",
+  "description": "Snel hondenlogboek voor Babs en Moos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2e7d4",
+  "theme_color": "#f6c453",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
