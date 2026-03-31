@@ -10,7 +10,7 @@ Open je Supabase project → **Project Settings → Functions → Secrets**.
 Voeg toe:
 
 - `SHORTCUTS_TOKEN` = een lange random token (min. 32 tekens)
-- `SUPABASE_SERVICE_ROLE_KEY` = je service role key (Project Settings → API)
+- `SERVICE_ROLE_KEY` = je service role key (Project Settings → API)
 
 > De service role key blijft alleen server‑side in de Edge Function.
 
@@ -22,7 +22,7 @@ Gebruik de Supabase CLI:
 supabase login
 supabase link --project-ref upnkcvswyiprbppiegtv
 supabase secrets set SHORTCUTS_TOKEN=JOUW_TOKEN
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY=JOUW_SERVICE_ROLE_KEY
+supabase secrets set SERVICE_ROLE_KEY=JOUW_SERVICE_ROLE_KEY
 supabase functions deploy log-event
 ```
 
