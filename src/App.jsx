@@ -933,7 +933,7 @@ function App() {
                             </h3>
                             <span className="chip">Tijdlijn</span>
                           </div>
-                          <div className="overflow-x-auto pb-2">
+                          <div className="scroll-lane pb-2">
                             <div className="relative h-24 min-w-[720px] rounded-2xl border border-amber-100 bg-amber-50/60">
                               {Array.from({ length: 25 }).map((_, hour) => (
                                 <div
