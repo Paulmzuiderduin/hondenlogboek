@@ -100,3 +100,58 @@ Je kunt een eigen timestamp meegeven:
 ```
 
 Als `created_at` ontbreekt, gebruikt de functie automatisch `now()`.
+
+## 5) Poep‑shortcut met keuzes + optionele foto
+
+Hiermee krijg je een echte one‑tap flow met keuzevragen.
+
+### Acties (in volgorde)
+
+1. **Kies uit menu** → “Consistentie”
+   - goed
+   - zacht
+   - diarree
+   - anders
+   - Sla de keuze op als variabele: `Consistentie`
+2. **Kies uit menu** → “Grootte”
+   - klein
+   - medium
+   - groot
+   - Sla op als variabele: `Grootte`
+3. **Kies uit menu** → “Foto toevoegen?”
+   - Ja
+   - Nee
+4. **Als Ja**:
+   - **Selecteer foto’s** (1 foto)
+   - **Resize afbeelding** (breedte 1200)
+   - **Encodeer** → Base64
+   - Sla op als variabele: `FotoBase64`
+
+### Daarna: “Haal inhoud op van URL”
+
+Headers:
+```
+Content-Type: application/json
+x-shortcuts-token: JOUW_TOKEN
+```
+
+JSON Body (Babs voorbeeld):
+```
+{
+  "dog": "Babs",
+  "type": "poep",
+  "data": {
+    "consistency": Consistentie,
+    "size": Grootte
+  },
+  "photo_base64": FotoBase64,
+  "photo_filename": "poep.jpg",
+  "photo_tag": "poep"
+}
+```
+
+> Laat `photo_base64` leeg als je “Nee” kiest.
+
+**Tip:** Als je een foutmelding krijgt dat de foto “te klein of beschadigd” is,
+controleer of je echt **“Encodeer met Base64”** op de afbeelding gebruikt
+(niet op het bestand of de metadata).

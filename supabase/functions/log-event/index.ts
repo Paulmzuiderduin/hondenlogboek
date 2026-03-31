@@ -17,6 +17,32 @@ const EVENT_TYPES = [
   'verzorging',
   'welzijn',
 ]
+const PHOTO_BUCKET = 'hondenlogboek-photos'
+
+const decodeBase64 = (value: string) => {
+  const cleaned = value
+    .replace(/^data:.*;base64,/, '')
+    .replace(/[\r\n\s]/g, '')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+  const binary = atob(cleaned)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
+}
+
+const getExtension = (filename = '', mime = '') => {
+  const lower = filename.toLowerCase()
+  if (lower.endsWith('.png')) return 'png'
+  if (lower.endsWith('.webp')) return 'webp'
+  if (lower.endsWith('.heic')) return 'heic'
+  if (mime.includes('png')) return 'png'
+  if (mime.includes('webp')) return 'webp'
+  if (mime.includes('heic')) return 'heic'
+  return 'jpg'
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -36,6 +62,10 @@ serve(async (req) => {
     type?: string
     data?: Record<string, unknown>
     created_at?: string
+    photo_base64?: string
+    photo_filename?: string
+    photo_mime?: string
+    photo_tag?: string
   }
 
   try {
@@ -96,6 +126,52 @@ serve(async (req) => {
     global: { headers: { 'X-Client-Info': 'shortcuts-log-event' } },
     auth: { persistSession: false },
   })
+
+  if (payload.photo_base64) {
+    const extension = getExtension(payload.photo_filename, payload.photo_mime)
+    const filename = payload.photo_filename || `shortcut.${extension}`
+    const path = `shortcuts/${dog}/${Date.now()}-${crypto.randomUUID()}.${extension}`
+    const bytes = decodeBase64(payload.photo_base64)
+    if (bytes.length < 1024) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'Foto lijkt te klein of beschadigd. Controleer de Base64 stap in je Shortcut.',
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+    const contentType =
+      payload.photo_mime || `image/${extension === 'jpg' ? 'jpeg' : extension}`
+    const { error: uploadError } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(path, bytes, { contentType })
+
+    if (uploadError) {
+      return new Response(JSON.stringify({ error: uploadError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(PHOTO_BUCKET)
+      .getPublicUrl(path)
+
+    const existingPhotos = Array.isArray((data as { photos?: unknown }).photos)
+      ? ((data as { photos?: unknown }).photos as Array<{ url?: string; tag?: string }>)
+      : []
+    const tag = payload.photo_tag || (type === 'welzijn' ? 'welzijn' : 'poep')
+    const nextPhotos = [
+      ...existingPhotos,
+      { url: publicUrlData.publicUrl, tag },
+    ]
+    ;(data as { photos?: unknown }).photos = nextPhotos
+    ;(data as { photo_filename?: string }).photo_filename = filename
+  }
 
   const { data: event, error } = await supabase
     .from('events')
