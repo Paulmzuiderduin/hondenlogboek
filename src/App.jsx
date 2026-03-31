@@ -172,6 +172,7 @@ function App() {
   const [newCareLabel, setNewCareLabel] = useState('')
   const [toasts, setToasts] = useState([])
   const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoPreview, setPhotoPreview] = useState(null)
   const configMissing = !isSupabaseConfigured
 
   const upsertEvent = useCallback((record) => {
@@ -642,6 +643,11 @@ function App() {
     setSheet(emptySheetState)
   }
 
+  const openPhotoPreview = (url) => {
+    if (!url) return
+    setPhotoPreview(url)
+  }
+
   const handleLogEvent = async ({ dog, type, data }) => {
     if (!supabase) {
       return
@@ -1095,7 +1101,7 @@ function App() {
                               type,
                               label: WALK_ACTION_LABELS[type] || type,
                               events: events.filter((event) => event.type === type),
-                            }))
+                            })).filter((group) => group.events.length > 0)
                             return (
                               <div
                                 key={`${slot.key}-${dog}`}
@@ -1127,59 +1133,57 @@ function App() {
                                               {group.events.length}x
                                             </span>
                                           </div>
-                                          {group.events.length === 0 ? (
-                                            <p className="mt-2 text-[10px] text-amber-500">
-                                              Geen logs.
-                                            </p>
-                                          ) : (
-                                            <div className="mt-2 space-y-1 text-xs text-amber-900">
-                                              {group.events.map((event) => {
-                                                const details = formatEventDetails(event)
-                                                const showDetails =
-                                                  details &&
-                                                  details.trim().toLowerCase() !==
-                                                    group.label.trim().toLowerCase()
-                                                const photos = normalizePhotos(
-                                                  event.data?.photos,
-                                                  event.type === 'poep'
-                                                    ? 'poep'
-                                                    : 'welzijn',
-                                                )
-                                                return (
-                                                  <div key={event.id} className="space-y-1">
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => openEditSheet(event)}
-                                                      className="w-full text-left"
-                                                    >
-                                                      <span className="font-semibold">
-                                                        {formatTimeInput(
-                                                          event.created_at,
-                                                        )}
+                                          <div className="mt-2 space-y-1 text-xs text-amber-900">
+                                            {group.events.map((event) => {
+                                              const details = formatEventDetails(event)
+                                              const showDetails =
+                                                details &&
+                                                details.trim().toLowerCase() !==
+                                                  group.label.trim().toLowerCase()
+                                              const photos = normalizePhotos(
+                                                event.data?.photos,
+                                                event.type === 'poep'
+                                                  ? 'poep'
+                                                  : 'welzijn',
+                                              )
+                                              return (
+                                                <div key={event.id} className="space-y-1">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => openEditSheet(event)}
+                                                    className="w-full text-left"
+                                                  >
+                                                    <span className="font-semibold">
+                                                      {formatTimeInput(
+                                                        event.created_at,
+                                                      )}
+                                                    </span>
+                                                    {showDetails ? (
+                                                      <span className="ml-2 text-amber-700">
+                                                        {details}
                                                       </span>
-                                                      {showDetails ? (
-                                                        <span className="ml-2 text-amber-700">
-                                                          {details}
-                                                        </span>
-                                                      ) : null}
-                                                    </button>
-                                                    {photos.length > 0 ? (
-                                                      <div className="flex flex-wrap gap-2">
-                                                        {photos.map((photo) => (
-                                                          <img
-                                                            key={photo.url}
-                                                            src={photo.url}
-                                                            alt="Log foto"
-                                                            className="h-7 w-7 rounded-2xl object-cover"
-                                                          />
-                                                        ))}
-                                                      </div>
                                                     ) : null}
-                                                  </div>
-                                                )
-                                              })}
-                                            </div>
-                                          )}
+                                                  </button>
+                                                  {photos.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                      {photos.map((photo) => (
+                                                        <img
+                                                          key={photo.url}
+                                                          src={photo.url}
+                                                          alt="Log foto"
+                                                          className="h-7 w-7 rounded-2xl object-cover"
+                                                          onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            openPhotoPreview(photo.url)
+                                                          }}
+                                                        />
+                                                      ))}
+                                                    </div>
+                                                  ) : null}
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
                                         </div>
                                       )
                                     })
@@ -1252,16 +1256,20 @@ function App() {
                                         ) : null}
                                         {photos.length > 0 ? (
                                           <div className="mt-2 flex flex-wrap gap-2">
-                                            {photos.map((photo) => (
-                                              <img
-                                                key={photo.url}
-                                                src={photo.url}
-                                                alt="Log foto"
-                                                className="h-8 w-8 rounded-2xl object-cover"
-                                              />
-                                            ))}
-                                          </div>
-                                        ) : null}
+                                              {photos.map((photo) => (
+                                                <img
+                                                  key={photo.url}
+                                                  src={photo.url}
+                                                  alt="Log foto"
+                                                  className="h-8 w-8 rounded-2xl object-cover"
+                                                  onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    openPhotoPreview(photo.url)
+                                                  }}
+                                                />
+                                              ))}
+                                            </div>
+                                          ) : null}
                                       </button>
                                     )
                                   })
@@ -1394,6 +1402,31 @@ function App() {
           </button>
         </div>
       </nav>
+
+      {photoPreview ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPhotoPreview(null)}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-[90vw]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <img
+              src={photoPreview}
+              alt="Vergrote foto"
+              className="max-h-[90vh] max-w-[90vw] rounded-3xl object-contain shadow-2xl"
+            />
+            <button
+              type="button"
+              className="btn btn-ghost absolute -right-2 -top-2 bg-white/90"
+              onClick={() => setPhotoPreview(null)}
+            >
+              Sluiten
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {sheet.open ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4">
@@ -1534,6 +1567,7 @@ function App() {
                             src={photo.url}
                             alt="Poep foto"
                             className="h-16 w-16 rounded-2xl object-cover"
+                            onClick={() => openPhotoPreview(photo.url)}
                           />
                           <button
                             type="button"
@@ -1954,6 +1988,7 @@ function App() {
                                     src={photo.url}
                                     alt={`Foto ${tag}`}
                                     className="h-16 w-16 rounded-2xl object-cover"
+                                    onClick={() => openPhotoPreview(photo.url)}
                                   />
                                   <button
                                     type="button"
