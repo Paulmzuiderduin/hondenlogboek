@@ -182,13 +182,17 @@ function App() {
       .upload(path, file, { upsert: false })
 
     if (uploadError) {
-      setError('Uploaden van de foto mislukte.')
+      setSheet((prev) => ({
+        ...prev,
+        error: 'Foto upload mislukt. Je kunt alsnog opslaan zonder foto.',
+      }))
+      addToast('Uploaden van de foto mislukte.', 'error')
       return null
     }
 
     const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path)
     return data?.publicUrl || null
-  }, [])
+  }, [addToast])
 
   const uploadPhotos = useCallback(
     async (files, pathPrefix) => {
@@ -1809,7 +1813,9 @@ function App() {
             className={`rounded-2xl border px-4 py-3 text-sm shadow ${
               toast.tone === 'success'
                 ? 'border-emerald-200/80 bg-white/95 text-emerald-900'
-                : 'border-amber-200/80 bg-white/95 text-amber-900'
+                : toast.tone === 'error'
+                  ? 'border-rose-200/80 bg-white/95 text-rose-900'
+                  : 'border-amber-200/80 bg-white/95 text-amber-900'
             }`}
           >
             {toast.message}
