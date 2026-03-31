@@ -105,6 +105,16 @@ De knop **“Exporteer CSV (gefilterd)”** gebruikt de huidige filters en dagli
 
 De app bevat een manifest en icons zodat je hem als homescreen app kunt toevoegen.
 
+## GitHub Pages deploy
+
+Deze repo bevat een GitHub Actions workflow die de app automatisch deployt naar GitHub Pages.
+
+1. Ga naar GitHub → repo settings → Pages.
+2. Selecteer **Source: GitHub Actions**.
+3. Controleer dat het custom domain is ingesteld op `hondenlogboek.paulzuiderduin.com`.
+
+Na de eerste deploy staat de app op: https://hondenlogboek.paulzuiderduin.com
+
 ## Structuur
 
 - `src/App.jsx` bevat alle UI + logica
