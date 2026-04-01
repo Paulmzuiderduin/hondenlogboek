@@ -23,6 +23,7 @@ const EVENT_TYPE_COLORS = {
   training: 'bg-indigo-500',
   verzorging: 'bg-rose-500',
   welzijn: 'bg-purple-500',
+  tanden: 'bg-emerald-500',
 }
 const EVENT_TYPE_ICONS = {
   poep: 'P',
@@ -31,6 +32,7 @@ const EVENT_TYPE_ICONS = {
   training: 'T',
   verzorging: 'V',
   welzijn: 'W',
+  tanden: '🪥',
 }
 const POOP_CONSISTENCY_COLORS = {
   goed: 'bg-emerald-500',
@@ -51,19 +53,29 @@ const PRUTJE_ADDITIVES = ['probiotica', 'sardineolie', 'psylliumvezels']
 const WELLBEING_LEVELS = ['laag', 'middel', 'hoog']
 const WELLBEING_TAGS = ['niet eten', 'kotsen', 'lusteloos']
 const PHOTO_BUCKET = 'hondenlogboek-photos'
-const WALK_ACTION_TYPES = ['poep', 'plas', 'maaltijd', 'training']
+const TREND_DAYS = 30
 const WALK_SLOTS = [
   { key: 'morning', label: 'Ochtendwandeling', range: '04:01–12:00' },
   { key: 'afternoon', label: 'Middagwandeling', range: '12:01–16:00' },
   { key: 'evening', label: 'Avondwandeling', range: '16:01–20:30' },
   { key: 'late', label: 'Late wandeling', range: '20:30–04:00' },
 ]
-const WALK_ACTION_LABELS = {
-  poep: 'Poep',
-  plas: 'Plas',
-  maaltijd: 'Maaltijd',
-  training: 'Training',
-}
+const WALK_GROUPS = [
+  { key: 'poep', label: 'Poep', match: (event) => event.type === 'poep' },
+  { key: 'plas', label: 'Plas', match: (event) => event.type === 'plas' },
+  {
+    key: 'maaltijd',
+    label: 'Maaltijd',
+    match: (event) => event.type === 'maaltijd',
+  },
+  {
+    key: 'tanden',
+    label: 'Tanden poetsen',
+    match: (event) =>
+      event.type === 'verzorging' &&
+      event.data?.care_action === 'tanden poetsen',
+  },
+]
 
 const DEFAULT_CARE_ACTIONS = [
   'borstelen',
@@ -403,13 +415,12 @@ function App() {
   const weeklyTrends = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const days = Array.from({ length: 7 }).map((_, index) => {
+    const days = Array.from({ length: TREND_DAYS }).map((_, index) => {
       const date = new Date(today)
-      date.setDate(date.getDate() - (6 - index))
+      date.setDate(date.getDate() - (TREND_DAYS - 1 - index))
       return {
         key: toDateKey(date),
         label: date.toLocaleDateString('nl-NL', {
-          weekday: 'short',
           day: 'numeric',
         }),
         full: date.toLocaleDateString('nl-NL', {
@@ -428,22 +439,11 @@ function App() {
           const dayEvents = dogEvents.filter(
             (event) => event.type === 'poep' && toDateKey(event.created_at) === day.key,
           )
-          const counts = POOP_CONSISTENCY.reduce((acc, consistency) => {
-            acc[consistency] = 0
-            return acc
-          }, {})
-          dayEvents.forEach((event) => {
-            const value = event.data?.consistency
-            if (value && counts[value] !== undefined) {
-              counts[value] += 1
-            }
-          })
           const total = dayEvents.length
-          const topConsistency =
-            total === 0
-              ? null
-              : Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null
-          return { ...day, total, counts, topConsistency }
+          const hasPhoto = dayEvents.some((event) =>
+            Array.isArray(event.data?.photos) && event.data.photos.length > 0
+          )
+          return { ...day, total, hasPhoto }
         })
 
         const wellbeing = days.map((day) => {
@@ -464,19 +464,10 @@ function App() {
               ? severityScores.reduce((sum, score) => sum + score, 0) /
                 severityScores.length
               : null
-          const dominant =
-            severityScores.length === 0
-              ? null
-              : avg >= 2.6
-                ? 'hoog'
-                : avg >= 1.6
-                  ? 'middel'
-                  : 'laag'
           return {
             ...day,
             total: dayEvents.length,
             avg,
-            dominant,
           }
         })
 
@@ -871,7 +862,11 @@ function App() {
     }, {})
 
     timelineEvents.forEach((event) => {
-      if (WALK_ACTION_TYPES.includes(event.type)) {
+      const isWalkEvent =
+        ['poep', 'plas', 'maaltijd'].includes(event.type) ||
+        (event.type === 'verzorging' &&
+          event.data?.care_action === 'tanden poetsen')
+      if (isWalkEvent) {
         const slotKey = getWalkSlot(event.created_at)
         const slot = slotMap[slotKey]
         if (slot && slot.dogs[event.dog]) {
@@ -1134,10 +1129,10 @@ function App() {
                         <div className="mt-3 grid grid-cols-2 gap-3">
                           {DOGS.map((dog) => {
                             const events = slot.dogs[dog] || []
-                            const grouped = WALK_ACTION_TYPES.map((type) => ({
-                              type,
-                              label: WALK_ACTION_LABELS[type] || type,
-                              events: events.filter((event) => event.type === type),
+                            const grouped = WALK_GROUPS.map((group) => ({
+                              type: group.key,
+                              label: group.label,
+                              events: events.filter(group.match),
                             })).filter((group) => group.events.length > 0)
                             return (
                               <div
@@ -1244,7 +1239,7 @@ function App() {
                           Algemeen (dag)
                         </p>
                         <p className="text-[11px] text-amber-600">
-                          Verzorging, welzijn en andere notities.
+                          Training, verzorging, welzijn en andere notities.
                         </p>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-3">
@@ -1336,9 +1331,9 @@ function App() {
               }`}
             >
               <div>
-                <h2 className="text-2xl font-semibold">Weekoverzicht</h2>
+                <h2 className="text-2xl font-semibold">Trends</h2>
                 <p className="mt-1 text-sm text-amber-800">
-                  Laatste 7 dagen met focus op poepconsistentie en welzijn.
+                  Laatste 30 dagen met focus op poep en welzijn.
                 </p>
               </div>
               <div className="space-y-3">
@@ -1349,65 +1344,75 @@ function App() {
                   >
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">{dogSummary.dog}</h3>
-                      <span className="chip">7 dagen</span>
+                      <span className="chip">30 dagen</span>
                     </div>
                     <div className="mt-4 space-y-4">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
-                          Poepconsistentie
+                          Poeptrend (incl. foto)
                         </p>
-                        <div className="mt-3 grid grid-cols-7 gap-2 text-[10px] text-amber-700">
+                        <div className="mt-3 flex items-end gap-1">
                           {dogSummary.poop.map((day) => {
-                            const color =
-                              day.topConsistency &&
-                              POOP_CONSISTENCY_COLORS[day.topConsistency]
-                                ? POOP_CONSISTENCY_COLORS[day.topConsistency]
-                                : 'bg-amber-200'
                             const height =
                               day.total === 0
-                                ? 6
-                                : Math.min(24, 8 + day.total * 4)
+                                ? 2
+                                : Math.min(28, 4 + day.total * 4)
+                            const color =
+                              day.total === 0 ? 'bg-amber-200' : 'bg-stone-600'
                             return (
-                              <div key={day.key} className="flex flex-col items-center gap-1">
-                                <div className="flex h-8 items-end">
-                                  <div
-                                    className={`w-3 rounded-full ${color}`}
-                                    style={{ height }}
-                                    title={day.full}
-                                  />
+                              <div key={day.key} className="flex flex-col items-center">
+                                <div className="mb-1 h-1">
+                                  {day.hasPhoto ? (
+                                    <span className="block h-1 w-1 rounded-full bg-rose-500" />
+                                  ) : (
+                                    <span className="block h-1 w-1 opacity-0" />
+                                  )}
                                 </div>
-                                <span>{day.label}</span>
+                                <div
+                                  className={`w-2 rounded-full ${color}`}
+                                  style={{ height }}
+                                  title={day.full}
+                                />
                               </div>
                             )
                           })}
                         </div>
+                        <div className="mt-2 flex justify-between text-[10px] text-amber-500">
+                          <span>{weeklyTrends.days[0].label}</span>
+                          <span>{weeklyTrends.days[weeklyTrends.days.length - 1].label}</span>
+                        </div>
                       </div>
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
-                          Welzijn
+                          Welzijn trend
                         </p>
-                        <div className="mt-3 grid grid-cols-7 gap-2 text-[10px] text-amber-700">
+                        <div className="mt-3 flex items-end gap-1">
                           {dogSummary.wellbeing.map((day) => {
+                            const avg = day.avg
                             const color =
-                              day.dominant &&
-                              WELLBEING_SEVERITY_COLORS[day.dominant]
-                                ? WELLBEING_SEVERITY_COLORS[day.dominant]
-                                : 'bg-amber-200'
+                              avg === null
+                                ? 'bg-amber-200'
+                                : avg >= 2.6
+                                  ? WELLBEING_SEVERITY_COLORS.hoog
+                                  : avg >= 1.6
+                                    ? WELLBEING_SEVERITY_COLORS.middel
+                                    : WELLBEING_SEVERITY_COLORS.laag
                             const height =
-                              day.avg === null ? 6 : Math.round(6 + day.avg * 6)
+                              avg === null ? 2 : Math.round(4 + avg * 6)
                             return (
-                              <div key={day.key} className="flex flex-col items-center gap-1">
-                                <div className="flex h-8 items-end">
-                                  <div
-                                    className={`w-3 rounded-full ${color}`}
-                                    style={{ height }}
-                                    title={day.full}
-                                  />
-                                </div>
-                                <span>{day.label}</span>
+                              <div key={day.key} className="flex flex-col items-center">
+                                <div
+                                  className={`w-2 rounded-full ${color}`}
+                                  style={{ height }}
+                                  title={day.full}
+                                />
                               </div>
                             )
                           })}
+                        </div>
+                        <div className="mt-2 flex justify-between text-[10px] text-amber-500">
+                          <span>{weeklyTrends.days[0].label}</span>
+                          <span>{weeklyTrends.days[weeklyTrends.days.length - 1].label}</span>
                         </div>
                       </div>
                     </div>
