@@ -34,6 +34,10 @@ const EVENT_TYPE_ICONS = {
   welzijn: 'W',
   tanden: '🪥',
 }
+const DOG_BADGE_COLORS = {
+  Babs: 'bg-amber-500',
+  Moos: 'bg-sky-500',
+}
 const POOP_CONSISTENCY_COLORS = {
   goed: 'bg-emerald-500',
   zacht: 'bg-amber-400',
@@ -106,6 +110,15 @@ const buildTimestamp = (dateKey, timeValue) => {
   const date = new Date(`${dateKey}T00:00:00`)
   date.setHours(hours, minutes, 0, 0)
   return date.toISOString()
+}
+
+const getWeekStart = (value) => {
+  const date = new Date(value)
+  date.setHours(0, 0, 0, 0)
+  const day = date.getDay()
+  const diff = (day + 6) % 7
+  date.setDate(date.getDate() - diff)
+  return date
 }
 
 const getWalkSlot = (value) => {
@@ -201,11 +214,18 @@ function App() {
   const [error, setError] = useState('')
   const [sheet, setSheet] = useState(emptySheetState)
   const [mobileTab, setMobileTab] = useState('loggen')
+  const [desktopTab, setDesktopTab] = useState('tijdlijn')
   const [newTrainingLabel, setNewTrainingLabel] = useState('')
   const [newCareLabel, setNewCareLabel] = useState('')
   const [toasts, setToasts] = useState([])
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoPreview, setPhotoPreview] = useState(null)
+  const [calendarView, setCalendarView] = useState('month')
+  const [calendarDate, setCalendarDate] = useState(new Date())
+  const [calendarTypeFilter, setCalendarTypeFilter] = useState(
+    EVENT_TYPES.map((type) => type.key),
+  )
+  const [calendarDogFilter, setCalendarDogFilter] = useState([...DOGS])
   const configMissing = !isSupabaseConfigured
 
   const upsertEvent = useCallback((record) => {
@@ -276,7 +296,7 @@ function App() {
       setLoading(true)
       setError('')
       const startDate = new Date()
-      startDate.setDate(startDate.getDate() - 13)
+      startDate.setDate(startDate.getDate() - 90)
 
       const [{ data: eventsData, error: eventsError },
         { data: trainingData, error: trainingError },
@@ -809,6 +829,18 @@ function App() {
     addToast('Verzorgingsactie toegevoegd.', 'success')
   }
 
+  const toggleCalendarType = (key) => {
+    setCalendarTypeFilter((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
+    )
+  }
+
+  const toggleCalendarDog = (dog) => {
+    setCalendarDogFilter((prev) =>
+      prev.includes(dog) ? prev.filter((item) => item !== dog) : [...prev, dog],
+    )
+  }
+
   const exportCSV = () => {
     const rows = filteredEvents.map((event) => ({
       id: event.id,
@@ -896,6 +928,68 @@ function App() {
     }
   }, [timelineEvents])
 
+  const calendarEvents = useMemo(() => {
+    return events.filter(
+      (event) =>
+        calendarTypeFilter.includes(event.type) &&
+        calendarDogFilter.includes(event.dog),
+    )
+  }, [events, calendarTypeFilter, calendarDogFilter])
+
+  const calendarMonthDays = useMemo(() => {
+    const monthStart = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1)
+    const gridStart = getWeekStart(monthStart)
+    return Array.from({ length: 42 }).map((_, index) => {
+      const date = new Date(gridStart)
+      date.setDate(gridStart.getDate() + index)
+      return date
+    })
+  }, [calendarDate])
+
+  const calendarWeekDays = useMemo(() => {
+    const start = getWeekStart(calendarDate)
+    return Array.from({ length: 7 }).map((_, index) => {
+      const date = new Date(start)
+      date.setDate(start.getDate() + index)
+      return date
+    })
+  }, [calendarDate])
+
+  const calendarLabel = useMemo(() => {
+    if (calendarView === 'month') {
+      return calendarDate.toLocaleDateString('nl-NL', {
+        month: 'long',
+        year: 'numeric',
+      })
+    }
+    if (calendarView === 'week') {
+      const start = calendarWeekDays[0]
+      const end = calendarWeekDays[calendarWeekDays.length - 1]
+      return `${start.toLocaleDateString('nl-NL', {
+        day: 'numeric',
+        month: 'short',
+      })} – ${end.toLocaleDateString('nl-NL', {
+        day: 'numeric',
+        month: 'short',
+      })}`
+    }
+    return formatLongDate(calendarDate)
+  }, [calendarDate, calendarView, calendarWeekDays])
+
+  const shiftCalendar = (direction) => {
+    setCalendarDate((prev) => {
+      const next = new Date(prev)
+      if (calendarView === 'month') {
+        next.setMonth(next.getMonth() + direction)
+      } else if (calendarView === 'week') {
+        next.setDate(next.getDate() + direction * 7)
+      } else {
+        next.setDate(next.getDate() + direction)
+      }
+      return next
+    })
+  }
+
   return (
     <div className="min-h-screen">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-28 pt-6 md:pb-16 md:pt-8">
@@ -909,7 +1003,22 @@ function App() {
               Snel loggen met één tik, realtime delen en overzicht per dag en week.
             </p>
           </div>
-          {null}
+          <div className="hidden md:flex items-center gap-2">
+            {[
+              { key: 'loggen', label: 'Loggen' },
+              { key: 'tijdlijn', label: 'Tijdlijn' },
+              { key: 'week', label: 'Trends' },
+              { key: 'kalender', label: 'Kalender' },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                className={`chip ${desktopTab === tab.key ? 'chip-active' : ''}`}
+                onClick={() => setDesktopTab(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </header>
 
         {error ? (
@@ -928,8 +1037,8 @@ function App() {
           <section className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
             <div
               className={`app-card space-y-4 p-4 md:p-5 ${
-                mobileTab === 'loggen' ? '' : 'hidden md:block'
-              }`}
+                mobileTab === 'loggen' ? '' : 'hidden'
+              } ${desktopTab === 'loggen' ? 'md:block' : 'md:hidden'}`}
             >
               <div>
                 <h2 className="text-2xl font-semibold">Snelle log</h2>
@@ -1012,8 +1121,8 @@ function App() {
 
             <div
               className={`app-card space-y-5 p-5 ${
-                mobileTab === 'tijdlijn' ? '' : 'hidden md:block'
-              }`}
+                mobileTab === 'tijdlijn' ? '' : 'hidden'
+              } ${desktopTab === 'tijdlijn' ? 'md:block' : 'md:hidden'}`}
             >
               <div>
                 <h2 className="text-2xl font-semibold">Filters</h2>
@@ -1081,8 +1190,8 @@ function App() {
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div
               className={`app-card space-y-3 p-4 sm:space-y-4 sm:p-5 ${
-                mobileTab === 'tijdlijn' ? '' : 'hidden md:block'
-              }`}
+                mobileTab === 'tijdlijn' ? '' : 'hidden'
+              } ${desktopTab === 'tijdlijn' ? 'md:block' : 'md:hidden'}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -1327,8 +1436,8 @@ function App() {
 
             <div
               className={`app-card space-y-4 p-5 ${
-                mobileTab === 'week' ? '' : 'hidden md:block'
-              }`}
+                mobileTab === 'week' ? '' : 'hidden'
+              } ${desktopTab === 'week' ? 'md:block' : 'md:hidden'}`}
             >
               <div>
                 <h2 className="text-2xl font-semibold">Trends</h2>
@@ -1419,6 +1528,323 @@ function App() {
                   </div>
                 ))}
               </div>
+            </div>
+          </section>
+
+          <section className={`${desktopTab === 'kalender' ? 'hidden md:block' : 'hidden'}`}>
+            <div className="app-card space-y-4 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-2xl font-semibold">Kalender</h2>
+                  <p className="mt-1 text-sm text-amber-800">
+                    Overzicht per maand, week of dag.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: 'month', label: 'Maand' },
+                    { key: 'week', label: 'Week' },
+                    { key: 'day', label: 'Dag' },
+                  ].map((view) => (
+                    <button
+                      key={view.key}
+                      className={`chip ${
+                        calendarView === view.key ? 'chip-active' : ''
+                      }`}
+                      onClick={() => setCalendarView(view.key)}
+                    >
+                      {view.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <button className="btn btn-ghost" onClick={() => shiftCalendar(-1)}>
+                  Vorige
+                </button>
+                <span className="text-sm font-semibold text-amber-900">
+                  {calendarLabel}
+                </span>
+                <button className="btn btn-ghost" onClick={() => shiftCalendar(1)}>
+                  Volgende
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+                  Filters
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="chip"
+                    onClick={() => setCalendarDogFilter([...DOGS])}
+                  >
+                    Alle honden
+                  </button>
+                  {DOGS.map((dog) => (
+                    <button
+                      key={dog}
+                      className={`chip ${
+                        calendarDogFilter.includes(dog) ? 'chip-active' : ''
+                      }`}
+                      onClick={() => toggleCalendarDog(dog)}
+                    >
+                      {dog}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="chip"
+                    onClick={() =>
+                      setCalendarTypeFilter(EVENT_TYPES.map((type) => type.key))
+                    }
+                  >
+                    Alle acties
+                  </button>
+                  {EVENT_TYPES.map((type) => (
+                    <button
+                      key={type.key}
+                      className={`chip ${
+                        calendarTypeFilter.includes(type.key) ? 'chip-active' : ''
+                      }`}
+                      onClick={() => toggleCalendarType(type.key)}
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {calendarView === 'month' ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-7 gap-2 text-xs text-amber-600">
+                    {['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map((label) => (
+                      <span key={label} className="text-center uppercase">
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {calendarMonthDays.map((date) => {
+                      const dateKey = toDateKey(date)
+                      const dayEvents = calendarEvents.filter(
+                        (event) => toDateKey(event.created_at) === dateKey,
+                      )
+                      const isCurrentMonth =
+                        date.getMonth() === calendarDate.getMonth()
+                      const isTodayCell =
+                        toDateKey(date) === toDateKey(new Date())
+                      const photos = dayEvents.flatMap((event) =>
+                        normalizePhotos(event.data?.photos),
+                      )
+                      return (
+                        <button
+                          key={dateKey}
+                          type="button"
+                          onClick={() => {
+                            setCalendarDate(date)
+                            setCalendarView('day')
+                          }}
+                          className={`min-h-[120px] rounded-2xl border border-amber-100/80 p-2 text-left ${
+                            isCurrentMonth
+                              ? 'bg-white/90'
+                              : 'bg-amber-50/70 text-amber-400'
+                          } ${isTodayCell ? 'ring-2 ring-amber-300' : ''}`}
+                        >
+                          <div className="flex items-center justify-between text-xs font-semibold text-amber-700">
+                            <span>{date.getDate()}</span>
+                            <div className="flex gap-1">
+                              {DOGS.map((dog) => {
+                                const count = dayEvents.filter(
+                                  (event) => event.dog === dog,
+                                ).length
+                                if (!count) return null
+                                return (
+                                  <span
+                                    key={`${dateKey}-${dog}`}
+                                    className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] text-white ${
+                                      DOG_BADGE_COLORS[dog] || 'bg-amber-500'
+                                    }`}
+                                  >
+                                    {count}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {dayEvents.slice(0, 6).map((event) => (
+                              <span
+                                key={event.id}
+                                className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] text-white ${
+                                  EVENT_TYPE_COLORS[event.type] || 'bg-amber-500'
+                                }`}
+                              >
+                                {EVENT_TYPE_ICONS[event.type] || ''}
+                              </span>
+                            ))}
+                          </div>
+                          {photos.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {photos.slice(0, 3).map((photo) => (
+                                <img
+                                  key={photo.url}
+                                  src={photo.url}
+                                  alt="Dag foto"
+                                  className="h-8 w-8 rounded-lg object-cover"
+                                />
+                              ))}
+                            </div>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {calendarView === 'week' ? (
+                <div className="grid grid-cols-7 gap-3">
+                  {calendarWeekDays.map((date) => {
+                    const dateKey = toDateKey(date)
+                    const dayEvents = calendarEvents.filter(
+                      (event) => toDateKey(event.created_at) === dateKey,
+                    )
+                    return (
+                      <div
+                        key={dateKey}
+                        className="rounded-2xl border border-amber-100/70 bg-white/90 p-2"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCalendarDate(date)
+                            setCalendarView('day')
+                          }}
+                          className="w-full text-left"
+                        >
+                          <p className="text-xs font-semibold text-amber-700">
+                            {date.toLocaleDateString('nl-NL', {
+                              weekday: 'short',
+                              day: 'numeric',
+                            })}
+                          </p>
+                        </button>
+                        <div className="mt-2 space-y-2">
+                          {dayEvents.length === 0 ? (
+                            <p className="text-[10px] text-amber-400">Geen logs</p>
+                          ) : (
+                            dayEvents.slice(0, 6).map((event) => {
+                              const photos = normalizePhotos(event.data?.photos)
+                              return (
+                                <button
+                                  key={event.id}
+                                  type="button"
+                                  onClick={() => openEditSheet(event)}
+                                  className="flex w-full flex-wrap items-center gap-1 text-[10px] text-amber-800"
+                                >
+                                  <span
+                                    className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] text-white ${
+                                      EVENT_TYPE_COLORS[event.type] || 'bg-amber-500'
+                                    }`}
+                                  >
+                                    {EVENT_TYPE_ICONS[event.type] || ''}
+                                  </span>
+                                  <span className="font-semibold">
+                                    {formatTimeInput(event.created_at)}
+                                  </span>
+                                  <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold text-white ${
+                                      DOG_BADGE_COLORS[event.dog] || 'bg-amber-500'
+                                    }`}
+                                  >
+                                    {event.dog}
+                                  </span>
+                                  <span className="truncate text-[10px] text-amber-700">
+                                    {EVENT_TYPE_LABELS[event.type] || event.type}
+                                  </span>
+                                  {photos[0] ? (
+                                    <img
+                                      src={photos[0].url}
+                                      alt="Log foto"
+                                      className="ml-auto h-5 w-5 rounded-md object-cover"
+                                    />
+                                  ) : null}
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
+
+              {calendarView === 'day' ? (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-amber-900">
+                    {formatLongDate(calendarDate)}
+                  </h3>
+                  <div className="space-y-2">
+                    {calendarEvents
+                      .filter(
+                        (event) =>
+                          toDateKey(event.created_at) === toDateKey(calendarDate),
+                      )
+                      .sort(
+                        (a, b) =>
+                          new Date(a.created_at) - new Date(b.created_at),
+                      )
+                      .map((event) => {
+                        const details = formatEventDetails(event)
+                        const photos = normalizePhotos(event.data?.photos)
+                        return (
+                          <div
+                            key={event.id}
+                            className="rounded-2xl border border-amber-100 bg-white/90 p-3"
+                          >
+                            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-amber-600">
+                              <span
+                                className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] text-white ${
+                                  EVENT_TYPE_COLORS[event.type] || 'bg-amber-500'
+                                }`}
+                              >
+                                {EVENT_TYPE_ICONS[event.type] || ''}
+                              </span>
+                              <span
+                                className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${
+                                  DOG_BADGE_COLORS[event.dog] || 'bg-amber-500'
+                                }`}
+                              >
+                                {event.dog}
+                              </span>
+                              <span>{formatTimeInput(event.created_at)}</span>
+                            </div>
+                            <p className="mt-2 text-sm text-amber-900">
+                              {details}
+                            </p>
+                            {photos.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {photos.map((photo) => (
+                                  <img
+                                    key={photo.url}
+                                    src={photo.url}
+                                    alt="Log foto"
+                                    className="h-12 w-12 rounded-2xl object-cover"
+                                    onClick={() => openPhotoPreview(photo.url)}
+                                  />
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </section>
         </main>
