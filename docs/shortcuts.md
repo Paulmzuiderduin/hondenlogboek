@@ -101,7 +101,35 @@ Je kunt een eigen timestamp meegeven:
 
 Als `created_at` ontbreekt, gebruikt de functie automatisch `now()`.
 
-## 5) Poep‑shortcut met keuzes + optionele foto
+### Tijd kiezen in Shortcuts (met standaard = nu)
+
+1. **Haal huidige datum**
+2. **Formatteer datum** → `HH:mm` (noem dit `StandaardTijd`)
+3. **Vraag om invoer** → type **Tijd**
+   - Default: `StandaardTijd`
+   - Sla op als `GekozenTijd`
+4. **Stel tijd in** (op de huidige datum)
+   - Datum = **Huidige datum**
+   - Tijd = **GekozenTijd**
+   - Resultaat → `DatumMetTijd`
+5. **Formatteer datum** → `yyyy-MM-dd'T'HH:mm:ss.SSS'Z'`
+   - Invoer = `DatumMetTijd`
+   - Resultaat → `CreatedAtISO`
+
+In je JSON body:
+```
+created_at = CreatedAtISO
+```
+
+## 5) Scriptable widget
+
+Voor een iOS widget met een korte samenvatting van de 4 wandelmomenten:
+
+- `docs/scriptable-widget.js`
+
+Vul daar je Supabase URL en anon key in en plak de code in Scriptable.
+
+## 6) Poep‑shortcut met keuzes + optionele foto
 
 Hiermee krijg je een echte one‑tap flow met keuzevragen.
 

@@ -17,12 +17,20 @@ const EVENT_TYPE_LABELS = EVENT_TYPES.reduce((acc, item) => {
 }, {})
 
 const EVENT_TYPE_COLORS = {
-  poep: 'bg-amber-600',
+  poep: 'bg-stone-600',
   plas: 'bg-sky-500',
   maaltijd: 'bg-orange-500',
   training: 'bg-indigo-500',
   verzorging: 'bg-rose-500',
   welzijn: 'bg-purple-500',
+}
+const EVENT_TYPE_ICONS = {
+  poep: 'P',
+  plas: 'U',
+  maaltijd: 'M',
+  training: 'T',
+  verzorging: 'V',
+  welzijn: 'W',
 }
 const POOP_CONSISTENCY_COLORS = {
   goed: 'bg-emerald-500',
@@ -38,7 +46,7 @@ const WELLBEING_SEVERITY_COLORS = {
 
 const POOP_CONSISTENCY = ['goed', 'zacht', 'diarree', 'anders']
 const POOP_SIZE = ['klein', 'medium', 'groot']
-const MEAL_TYPES = ['brokken', 'rauwvoer', 'prutje']
+const MEAL_BASE_TYPES = ['brokken', 'rauwvoer']
 const PRUTJE_ADDITIVES = ['probiotica', 'sardineolie', 'psylliumvezels']
 const WELLBEING_LEVELS = ['laag', 'middel', 'hoog']
 const WELLBEING_TAGS = ['niet eten', 'kotsen', 'lusteloos']
@@ -57,7 +65,12 @@ const WALK_ACTION_LABELS = {
   training: 'Training',
 }
 
-const DEFAULT_CARE_ACTIONS = ['borstelen', 'blazen', 'nagels knippen']
+const DEFAULT_CARE_ACTIONS = [
+  'borstelen',
+  'blazen',
+  'nagels knippen',
+  'tanden poetsen',
+]
 const DEFAULT_TRAINING_TYPES = ['Algemeen']
 
 const toDateKey = (value) => {
@@ -126,6 +139,14 @@ const formatEventDetails = (event) => {
       if (data.meal_type === 'prutje') {
         const additives = (data.additives || []).join(', ')
         return `Prutje${additives ? ` (${additives})` : ''}`
+      }
+      if (data.main_meal || data.prutje) {
+        const base = data.main_meal ? data.main_meal : ''
+        const additives = (data.additives || []).join(', ')
+        const prutjeLabel = data.prutje
+          ? ` + prutje${additives ? ` (${additives})` : ''}`
+          : ''
+        return `${base || 'Maaltijd'}${prutjeLabel}`.trim()
       }
       return data.meal_type || 'Maaltijd'
     case 'training':
@@ -493,7 +514,7 @@ function App() {
         type,
         date: '',
         time: '',
-        data: { meal_type: 'brokken', additives: [] },
+        data: { main_meal: 'brokken', prutje: false, additives: [] },
         error: '',
       })
       return
@@ -553,10 +574,14 @@ function App() {
     }
 
     if (event.type === 'maaltijd') {
-      const mealType = data.meal_type || 'brokken'
+      const legacyMeal = data.meal_type || ''
+      const prutjeActive = data.prutje || legacyMeal === 'prutje'
+      const baseMeal =
+        data.main_meal ||
+        (legacyMeal && legacyMeal !== 'prutje' ? legacyMeal : 'brokken')
       const additives = Array.isArray(data.additives)
         ? data.additives
-        : mealType === 'prutje'
+        : prutjeActive
           ? PRUTJE_ADDITIVES
           : []
       setSheet({
@@ -568,7 +593,8 @@ function App() {
         date: toDateKey(event.created_at),
         time: formatTimeInput(event.created_at),
         data: {
-          meal_type: mealType,
+          main_meal: baseMeal,
+          prutje: prutjeActive,
           additives,
         },
         error: '',
@@ -732,6 +758,10 @@ function App() {
 
   const logQuick = async (dog, type) => {
     await handleLogEvent({ dog, type, data: {} })
+  }
+
+  const logQuickCare = async (dog, care_action) => {
+    await handleLogEvent({ dog, type: 'verzorging', data: { care_action } })
   }
 
   const handleAddTraining = async () => {
@@ -959,6 +989,13 @@ function App() {
                         Training
                       </button>
                       <button
+                        className="btn btn-muted px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
+                        onClick={() => logQuickCare(dog, 'tanden poetsen')}
+                        disabled={saving || configMissing}
+                      >
+                        Tanden poetsen
+                      </button>
+                      <button
                         className="btn btn-ghost px-3 py-2 text-xs md:px-4 md:py-3 md:text-sm"
                         onClick={() => openSheet(dog, 'verzorging')}
                         disabled={saving || configMissing}
@@ -1123,15 +1160,19 @@ function App() {
                                           <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-[0.2em] text-amber-600">
                                             <div className="flex items-center gap-2">
                                               <span
-                                                className={`h-2.5 w-2.5 rounded-full ${color}`}
-                                              ></span>
+                                                className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-semibold text-white ${color}`}
+                                              >
+                                                {EVENT_TYPE_ICONS[group.type] || ''}
+                                              </span>
                                               <span className="chip px-2 py-1 text-[9px]">
                                                 {group.label}
                                               </span>
                                             </div>
-                                            <span className="text-[10px] text-amber-700">
-                                              {group.events.length}x
-                                            </span>
+                                            {group.type !== 'maaltijd' ? (
+                                              <span className="text-[10px] text-amber-700">
+                                                {group.events.length}x
+                                              </span>
+                                            ) : null}
                                           </div>
                                           <div className="mt-2 space-y-1 text-xs text-amber-900">
                                             {group.events.map((event) => {
@@ -1151,18 +1192,20 @@ function App() {
                                                   <button
                                                     type="button"
                                                     onClick={() => openEditSheet(event)}
-                                                    className="w-full text-left"
+                                                    className="w-full min-w-0 text-left"
                                                   >
-                                                    <span className="font-semibold">
-                                                      {formatTimeInput(
-                                                        event.created_at,
-                                                      )}
-                                                    </span>
-                                                    {showDetails ? (
-                                                      <span className="ml-2 text-amber-700">
-                                                        {details}
+                                                    <div className="text-xs text-amber-900">
+                                                      <span className="font-semibold">
+                                                        {formatTimeInput(
+                                                          event.created_at,
+                                                        )}
                                                       </span>
-                                                    ) : null}
+                                                      {showDetails ? (
+                                                        <span className="mt-0.5 block break-words text-amber-700 whitespace-normal">
+                                                          {details}
+                                                        </span>
+                                                      ) : null}
+                                                    </div>
                                                   </button>
                                                   {photos.length > 0 ? (
                                                     <div className="flex flex-wrap gap-2">
@@ -1243,14 +1286,16 @@ function App() {
                                         <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-amber-600">
                                           <span>{formatTimeInput(event.created_at)}</span>
                                           <span
-                                            className={`h-2.5 w-2.5 rounded-full ${color}`}
-                                          ></span>
+                                            className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-semibold text-white ${color}`}
+                                          >
+                                            {EVENT_TYPE_ICONS[event.type] || ''}
+                                          </span>
                                           <span className="chip px-2 py-1 text-[9px]">
                                             {typeLabel}
                                           </span>
                                         </div>
                                         {showDetails ? (
-                                          <p className="mt-2 text-xs text-amber-900 sm:text-sm">
+                                          <p className="mt-2 text-xs text-amber-900 sm:text-sm break-words">
                                             {details}
                                           </p>
                                         ) : null}
@@ -1669,26 +1714,22 @@ function App() {
             {sheet.type === 'maaltijd' ? (
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm font-semibold text-amber-900">Type maaltijd</p>
+                  <p className="text-sm font-semibold text-amber-900">
+                    Basis maaltijd
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {MEAL_TYPES.map((item) => (
+                    {MEAL_BASE_TYPES.map((item) => (
                       <button
                         key={item}
                         className={`chip ${
-                          sheet.data.meal_type === item ? 'chip-active' : ''
+                          sheet.data.main_meal === item ? 'chip-active' : ''
                         }`}
                         onClick={() =>
                           setSheet((prev) => ({
                             ...prev,
                             data: {
                               ...prev.data,
-                              meal_type: item,
-                              additives:
-                                item === 'prutje'
-                                  ? prev.data.additives.length
-                                    ? prev.data.additives
-                                    : PRUTJE_ADDITIVES
-                                  : [],
+                              main_meal: item,
                             },
                             error: '',
                           }))
@@ -1699,7 +1740,35 @@ function App() {
                     ))}
                   </div>
                 </div>
-                {sheet.data.meal_type === 'prutje' ? (
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">
+                    Prutje erbij?
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      className={`chip ${
+                        sheet.data.prutje ? 'chip-active' : ''
+                      }`}
+                      onClick={() =>
+                        setSheet((prev) => ({
+                          ...prev,
+                          data: {
+                            ...prev.data,
+                            prutje: !prev.data.prutje,
+                            additives: !prev.data.prutje
+                              ? prev.data.additives.length
+                                ? prev.data.additives
+                                : PRUTJE_ADDITIVES
+                              : [],
+                          },
+                        }))
+                      }
+                    >
+                      Prutje
+                    </button>
+                  </div>
+                </div>
+                {sheet.data.prutje ? (
                   <div>
                     <p className="text-sm font-semibold text-amber-900">
                       Additieven (voorgeselecteerd)
@@ -1739,7 +1808,8 @@ function App() {
                       dog: sheet.dog,
                       type: 'maaltijd',
                       data: {
-                        meal_type: sheet.data.meal_type,
+                        main_meal: sheet.data.main_meal,
+                        prutje: sheet.data.prutje,
                         additives: sheet.data.additives,
                       },
                     }
