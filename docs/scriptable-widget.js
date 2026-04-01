@@ -12,6 +12,12 @@ const WALK_SLOTS = [
   { key: 'evening', label: 'Avond', range: '16:01–20:30' },
   { key: 'late', label: 'Laat', range: '20:30–04:00' },
 ]
+const CONSISTENCY_ABBR = {
+  goed: 'g',
+  zacht: 'z',
+  diarree: 'd',
+  anders: 'a',
+}
 
 const formatter = new DateFormatter()
 formatter.locale = 'nl-NL'
@@ -81,19 +87,36 @@ function summarize(events) {
   return slots
 }
 
+function summarizePoops(events) {
+  const counts = { goed: 0, zacht: 0, diarree: 0, anders: 0 }
+  events.forEach((event) => {
+    const value = event.data?.consistency
+    if (value && counts[value] !== undefined) {
+      counts[value] += 1
+    }
+  })
+  const parts = Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([key, count]) => `${CONSISTENCY_ABBR[key] || key}${count}`)
+  return parts.length ? parts.join(' ') : '—'
+}
+
 function formatMeal(event) {
   const data = event.data || {}
-  if (data.meal_type === 'prutje') {
-    const additives = (data.additives || []).join(', ')
-    return `Prutje${additives ? ` (${additives})` : ''}`
+  const legacyBase =
+    data.meal_type && data.meal_type !== 'prutje' ? data.meal_type : ''
+  const base = data.main_meal || legacyBase
+  const prutjeActive = data.prutje || data.meal_type === 'prutje'
+  const additives = (data.additives || []).join(', ')
+
+  if (base && prutjeActive) {
+    return `${base} + prutje${additives ? ` (${additives})` : ''}`
   }
-  if (data.main_meal || data.prutje) {
-    const base = data.main_meal || 'Maaltijd'
-    if (data.prutje) {
-      const additives = (data.additives || []).join(', ')
-      return `${base} + prutje${additives ? ` (${additives})` : ''}`
-    }
+  if (base) {
     return base
+  }
+  if (prutjeActive) {
+    return `Prutje${additives ? ` (${additives})` : ''}`
   }
   return data.meal_type || 'Maaltijd'
 }
@@ -105,16 +128,27 @@ function formatTime(value) {
   return `${h}:${m}`
 }
 
+function truncate(text, max) {
+  if (!text) return text
+  if (text.length <= max) return text
+  return `${text.slice(0, max - 1)}…`
+}
+
 const widget = new ListWidget()
 widget.backgroundColor = new Color('#fff7e6')
 widget.setPadding(12, 12, 12, 12)
+const isMedium = config.widgetFamily === 'medium'
+const titleFont = Font.boldSystemFont(isMedium ? 14 : 16)
+const subtitleFont = Font.systemFont(isMedium ? 10 : 11)
+const headerFont = Font.boldSystemFont(isMedium ? 11 : 12)
+const lineFont = Font.systemFont(isMedium ? 9 : 10)
 
 const title = widget.addText('Hondenlogboek')
-title.font = Font.boldSystemFont(16)
+title.font = titleFont
 title.textColor = new Color('#3a2618')
 
 const subtitle = widget.addText(formatter.string(new Date()))
-subtitle.font = Font.systemFont(11)
+subtitle.font = subtitleFont
 subtitle.textColor = new Color('#8b6b3e')
 
 widget.addSpacer(8)
@@ -134,7 +168,7 @@ WALK_SLOTS.forEach((slot, index) => {
   const slotStack = widget.addStack()
   slotStack.layoutVertically()
   const header = slotStack.addText(`${slot.label}`)
-  header.font = Font.boldSystemFont(12)
+  header.font = headerFont
   header.textColor = new Color('#3a2618')
 
   DOGS.forEach((dog) => {
@@ -142,19 +176,25 @@ WALK_SLOTS.forEach((slot, index) => {
     const poops = bucket.poops.length
     const teeth = bucket.teeth
     const meals = bucket.meals.map((event) => formatMeal(event))
-    const mealSummary = meals.length ? meals.join(', ') : '—'
-
+    const mealSummary = meals.length ? meals.join(' / ') : '—'
+    const poopDetails = summarizePoops(bucket.poops)
     const line = slotStack.addText(
-      `${dog}: 💩 ${poops} • 🪥 ${teeth} • 🍽 ${mealSummary}`,
+      `${dog}: 💩 ${poops} (${poopDetails}) • 🪥 ${teeth} • 🍽 ${truncate(
+        mealSummary,
+        isMedium ? 26 : 40,
+      )}`,
     )
-    line.font = Font.systemFont(10)
+    line.font = lineFont
     line.textColor = new Color('#6b4b2c')
+    line.lineLimit = 1
+    line.minimumScaleFactor = 0.7
   })
 
   if (index < WALK_SLOTS.length - 1) {
-    widget.addSpacer(6)
+    widget.addSpacer(isMedium ? 4 : 6)
   }
 })
 
+widget.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000)
 Script.setWidget(widget)
 Script.complete()
