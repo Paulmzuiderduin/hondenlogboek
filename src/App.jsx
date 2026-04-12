@@ -195,6 +195,9 @@ const formatEventDetails = (event) => {
       }
       return data.meal_type || 'Maaltijd'
     case 'training':
+      if (data.note) {
+        return `${data.training_type || 'Training'} · ${data.note}`
+      }
       return data.training_type || 'Training'
     case 'verzorging':
       return data.care_action || 'Verzorging'
@@ -568,6 +571,21 @@ function App() {
       return
     }
 
+    if (type === 'training') {
+      setSheet({
+        open: true,
+        mode: 'create',
+        eventId: null,
+        dog,
+        type,
+        date: '',
+        time: '',
+        data: { training_type: '', note: '' },
+        error: '',
+      })
+      return
+    }
+
     setSheet({
       open: true,
       mode: 'create',
@@ -664,7 +682,7 @@ function App() {
         type: event.type,
         date: toDateKey(event.created_at),
         time: formatTimeInput(event.created_at),
-        data: { training_type: data.training_type || '' },
+        data: { training_type: data.training_type || '', note: data.note || '' },
         error: '',
       })
       return
@@ -2292,28 +2310,32 @@ function App() {
                         className={`chip ${
                           sheet.data.training_type === item.label ? 'chip-active' : ''
                         }`}
-                        onClick={async () => {
-                          const payload = {
-                            dog: sheet.dog,
-                            type: 'training',
-                            data: { training_type: item.label },
-                          }
-                          if (isEdit) {
-                            await handleUpdateEvent({
-                              id: sheet.eventId,
-                              ...payload,
-                              created_at: editedTimestamp,
-                            })
-                          } else {
-                            await handleLogEvent(payload)
-                          }
-                          closeSheet()
-                        }}
+                        onClick={() =>
+                          setSheet((prev) => ({
+                            ...prev,
+                            data: { ...prev.data, training_type: item.label },
+                            error: '',
+                          }))
+                        }
                       >
                         {item.label}
                       </button>
                     ))}
                   </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Notitie</p>
+                  <textarea
+                    className="input mt-2 min-h-[90px]"
+                    value={sheet.data.note || ''}
+                    onChange={(event) =>
+                      setSheet((prev) => ({
+                        ...prev,
+                        data: { ...prev.data, note: event.target.value },
+                      }))
+                    }
+                    placeholder="Korte notitie, bijv. focus, rustig, prikkelrijk"
+                  />
                 </div>
                 <div className="rounded-2xl border border-amber-200/70 bg-amber-50/60 p-3">
                   <p className="text-xs uppercase tracking-[0.3em] text-amber-600">
@@ -2334,24 +2356,32 @@ function App() {
                 {sheet.error ? (
                   <p className="text-sm text-amber-700">{sheet.error}</p>
                 ) : null}
-                {isEdit ? (
-                  <button
-                    className="btn btn-primary w-full"
-                    disabled={!sheet.data.training_type}
-                    onClick={async () => {
+                <button
+                  className="btn btn-primary w-full"
+                  disabled={!sheet.data.training_type}
+                  onClick={async () => {
+                    const payload = {
+                      dog: sheet.dog,
+                      type: 'training',
+                      data: {
+                        training_type: sheet.data.training_type,
+                        note: sheet.data.note || '',
+                      },
+                    }
+                    if (isEdit) {
                       await handleUpdateEvent({
                         id: sheet.eventId,
-                        dog: sheet.dog,
-                        type: 'training',
-                        data: { training_type: sheet.data.training_type },
+                        ...payload,
                         created_at: editedTimestamp,
                       })
-                      closeSheet()
-                    }}
-                  >
-                    Wijzigingen opslaan
-                  </button>
-                ) : null}
+                    } else {
+                      await handleLogEvent(payload)
+                    }
+                    closeSheet()
+                  }}
+                >
+                  {isEdit ? 'Wijzigingen opslaan' : 'Training opslaan'}
+                </button>
               </div>
             ) : null}
 
