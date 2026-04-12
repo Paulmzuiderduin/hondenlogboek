@@ -130,6 +130,26 @@ const getWalkSlot = (value) => {
   return 'evening'
 }
 
+const isLateNight = (value) => {
+  const date = new Date(value)
+  const minutes = date.getHours() * 60 + date.getMinutes()
+  return minutes <= 4 * 60
+}
+
+const isWalkEventType = (event) =>
+  ['poep', 'plas', 'maaltijd'].includes(event.type) ||
+  (event.type === 'verzorging' &&
+    event.data?.care_action === 'tanden poetsen')
+
+const getEventDateKey = (event) => {
+  if (event && isWalkEventType(event) && isLateNight(event.created_at)) {
+    const date = new Date(event.created_at)
+    date.setDate(date.getDate() - 1)
+    return toDateKey(date)
+  }
+  return toDateKey(event.created_at)
+}
+
 const formatLongDate = (value) =>
   new Date(value).toLocaleDateString('nl-NL', {
     weekday: 'long',
@@ -421,7 +441,7 @@ function App() {
     return events.filter((event) => {
       const matchesDog = activeDog === 'alle' || event.dog === activeDog
       const matchesType = activeType === 'alle' || event.type === activeType
-      const matchesDate = toDateKey(event.created_at) === selectedDate
+      const matchesDate = getEventDateKey(event) === selectedDate
       return matchesDog && matchesType && matchesDate
     })
   }, [events, activeDog, activeType, selectedDate])
@@ -457,7 +477,9 @@ function App() {
         const dogEvents = events.filter((event) => event.dog === dog)
         const poop = days.map((day) => {
           const dayEvents = dogEvents.filter(
-            (event) => event.type === 'poep' && toDateKey(event.created_at) === day.key,
+            (event) =>
+              event.type === 'poep' &&
+              getEventDateKey(event) === day.key,
           )
           const total = dayEvents.length
           const hasPhoto = dayEvents.some((event) =>
@@ -894,11 +916,7 @@ function App() {
     }, {})
 
     timelineEvents.forEach((event) => {
-      const isWalkEvent =
-        ['poep', 'plas', 'maaltijd'].includes(event.type) ||
-        (event.type === 'verzorging' &&
-          event.data?.care_action === 'tanden poetsen')
-      if (isWalkEvent) {
+      if (isWalkEventType(event)) {
         const slotKey = getWalkSlot(event.created_at)
         const slot = slotMap[slotKey]
         if (slot && slot.dogs[event.dog]) {
@@ -1630,7 +1648,7 @@ function App() {
                     {calendarMonthDays.map((date) => {
                       const dateKey = toDateKey(date)
                       const dayEvents = calendarEvents.filter(
-                        (event) => toDateKey(event.created_at) === dateKey,
+                        (event) => getEventDateKey(event) === dateKey,
                       )
                       const isCurrentMonth =
                         date.getMonth() === calendarDate.getMonth()
@@ -1710,7 +1728,7 @@ function App() {
                   {calendarWeekDays.map((date) => {
                     const dateKey = toDateKey(date)
                     const dayEvents = calendarEvents.filter(
-                      (event) => toDateKey(event.created_at) === dateKey,
+                      (event) => getEventDateKey(event) === dateKey,
                     )
                     return (
                       <div
@@ -1792,7 +1810,7 @@ function App() {
                     {calendarEvents
                       .filter(
                         (event) =>
-                          toDateKey(event.created_at) === toDateKey(calendarDate),
+                          getEventDateKey(event) === toDateKey(calendarDate),
                       )
                       .sort(
                         (a, b) =>
