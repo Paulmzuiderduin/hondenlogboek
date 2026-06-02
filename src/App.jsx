@@ -38,6 +38,10 @@ const DOG_BADGE_COLORS = {
   Babs: 'bg-amber-500',
   Moos: 'bg-sky-500',
 }
+const DOG_LINE_COLORS = {
+  Babs: '#d97706',
+  Moos: '#0284c7',
+}
 const POOP_CONSISTENCY_COLORS = {
   goed: 'bg-emerald-500',
   zacht: 'bg-amber-400',
@@ -157,6 +161,520 @@ const formatLongDate = (value) =>
     month: 'long',
   })
 
+const formatDateInput = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const parseDateInput = (value) => {
+  if (!value) return null
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+const addDays = (date, amount) => {
+  const next = new Date(date)
+  next.setDate(next.getDate() + amount)
+  return next
+}
+
+const buildDateRangeDays = (startValue, endValue) => {
+  const startDate = parseDateInput(startValue)
+  const endDate = parseDateInput(endValue)
+  if (!startDate || !endDate) return []
+
+  const first = startDate <= endDate ? startDate : endDate
+  const last = startDate <= endDate ? endDate : startDate
+  const days = []
+  const cursor = new Date(first)
+  cursor.setHours(0, 0, 0, 0)
+  last.setHours(0, 0, 0, 0)
+
+  while (cursor <= last) {
+    days.push({
+      key: formatDateInput(cursor),
+      date: new Date(cursor),
+      label: cursor.toLocaleDateString('nl-NL', {
+        day: 'numeric',
+        month: 'short',
+      }),
+      full: cursor.toLocaleDateString('nl-NL', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      }),
+    })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return days
+}
+
+const mapConsistencyScore = (value) => {
+  if (value === 'goed') return 4
+  if (value === 'zacht') return 3
+  if (value === 'anders') return 2
+  if (value === 'diarree') return 1
+  return null
+}
+
+const mapSeverityScore = (value) => {
+  if (value === 'hoog') return 3
+  if (value === 'middel') return 2
+  if (value === 'laag') return 1
+  return null
+}
+
+const toAverage = (values) => {
+  const numeric = values.filter((value) => typeof value === 'number')
+  if (!numeric.length) return null
+  return numeric.reduce((sum, value) => sum + value, 0) / numeric.length
+}
+
+const uniqueSortedIndices = (indices) =>
+  [...new Set(indices.filter((index) => Number.isInteger(index) && index >= 0))].sort(
+    (a, b) => a - b,
+  )
+
+function TrendChart({
+  title,
+  subtitle,
+  days,
+  points,
+  color,
+  minValue,
+  maxValue,
+  valueLabels,
+}) {
+  const width = 1000
+  const height = 220
+  const padding = { top: 22, right: 22, bottom: 42, left: 52 }
+  const chartWidth = width - padding.left - padding.right
+  const chartHeight = height - padding.top - padding.bottom
+  const hasData = points.some((point) => typeof point.value === 'number')
+  const tickIndices = uniqueSortedIndices(
+    days.length <= 1
+      ? [0]
+      : [0, Math.floor((days.length - 1) / 3), Math.floor((days.length - 1) * 2 / 3), days.length - 1],
+  )
+
+  const pointPositions = points.map((point, index) => {
+    const x =
+      padding.left +
+      (days.length <= 1 ? chartWidth / 2 : (index / (days.length - 1)) * chartWidth)
+    if (typeof point.value !== 'number') {
+      return { ...point, x, y: null }
+    }
+    const ratio = (point.value - minValue) / (maxValue - minValue || 1)
+    const y = padding.top + (1 - Math.max(0, Math.min(1, ratio))) * chartHeight
+    return { ...point, x, y }
+  })
+
+  const segments = []
+  let current = []
+  pointPositions.forEach((point) => {
+    if (point.y === null) {
+      if (current.length > 1) segments.push(current)
+      current = []
+      return
+    }
+    current.push(point)
+  })
+  if (current.length > 1) segments.push(current)
+
+  const segmentPath = (segment) =>
+    segment
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+      .join(' ')
+
+  return (
+    <div className="rounded-3xl border border-amber-200/70 bg-white/85 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h4 className="text-lg font-semibold">{title}</h4>
+          <p className="mt-1 text-xs text-amber-700">{subtitle}</p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.2em] text-amber-600">
+          {valueLabels.map((label) => (
+            <span
+              key={label}
+              className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50/70">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full">
+          {Array.from({ length: 4 }).map((_, index) => {
+            const y = padding.top + (chartHeight / 3) * index
+            return (
+              <g key={index}>
+                <line
+                  x1={padding.left}
+                  x2={width - padding.right}
+                  y1={y}
+                  y2={y}
+                  stroke="#e7cfa7"
+                  strokeDasharray="4 6"
+                />
+              </g>
+            )
+          })}
+          {tickIndices.map((index) => {
+            const x =
+              padding.left +
+              (days.length <= 1 ? chartWidth / 2 : (index / (days.length - 1)) * chartWidth)
+            const label = days[index]
+            return (
+              <g key={`${label.key}-tick`}>
+                <line
+                  x1={x}
+                  x2={x}
+                  y1={padding.top}
+                  y2={height - padding.bottom}
+                  stroke="#f0d9b5"
+                  strokeDasharray="4 8"
+                />
+                <text
+                  x={x}
+                  y={height - 14}
+                  textAnchor="middle"
+                  className="fill-amber-700 text-[10px]"
+                >
+                  {label.label}
+                </text>
+              </g>
+            )
+          })}
+          {segments.map((segment, index) => (
+            <path
+              key={index}
+              d={segmentPath(segment)}
+              fill="none"
+              stroke={color}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+          {pointPositions.map((point, index) =>
+            point.y === null ? null : (
+              <g key={`${point.key}-${index}`}>
+                {point.hasPhoto ? (
+                  <text
+                    x={point.x}
+                    y={point.y - 12}
+                    textAnchor="middle"
+                    className="fill-amber-900 text-[12px]"
+                  >
+                    📷
+                  </text>
+                ) : null}
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r="6"
+                  fill="#fff"
+                  stroke={color}
+                  strokeWidth="3"
+                />
+                <circle cx={point.x} cy={point.y} r="3" fill={color} />
+              </g>
+            ),
+          )}
+          {!hasData ? (
+            <text
+              x={width / 2}
+              y={height / 2}
+              textAnchor="middle"
+              className="fill-amber-600 text-[14px]"
+            >
+              Geen data in dit bereik
+            </text>
+          ) : null}
+          <text x="14" y="34" className="fill-amber-600 text-[10px] uppercase">
+            {valueLabels[valueLabels.length - 1]}
+          </text>
+          <text x="14" y={height - 48} className="fill-amber-600 text-[10px] uppercase">
+            {valueLabels[0]}
+          </text>
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+const escapeHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+const buildTrendChartSvgMarkup = ({
+  days,
+  points,
+  color,
+  minValue,
+  maxValue,
+  valueLabels,
+}) => {
+  const width = 1000
+  const height = 220
+  const padding = { top: 22, right: 22, bottom: 42, left: 52 }
+  const chartWidth = width - padding.left - padding.right
+  const chartHeight = height - padding.top - padding.bottom
+  const tickIndices = uniqueSortedIndices(
+    days.length <= 1
+      ? [0]
+      : [0, Math.floor((days.length - 1) / 3), Math.floor(((days.length - 1) * 2) / 3), days.length - 1],
+  )
+
+  const pointPositions = points.map((point, index) => {
+    const x =
+      padding.left +
+      (days.length <= 1 ? chartWidth / 2 : (index / (days.length - 1)) * chartWidth)
+    if (typeof point.value !== 'number') {
+      return { ...point, x, y: null }
+    }
+    const ratio = (point.value - minValue) / (maxValue - minValue || 1)
+    const y = padding.top + (1 - Math.max(0, Math.min(1, ratio))) * chartHeight
+    return { ...point, x, y }
+  })
+
+  const segments = []
+  let current = []
+  pointPositions.forEach((point) => {
+    if (point.y === null) {
+      if (current.length > 1) segments.push(current)
+      current = []
+      return
+    }
+    current.push(point)
+  })
+  if (current.length > 1) segments.push(current)
+
+  const segmentPath = (segment) =>
+    segment
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+      .join(' ')
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Trend grafiek">
+      ${Array.from({ length: 4 })
+        .map((_, index) => {
+          const y = padding.top + (chartHeight / 3) * index
+          return `<line x1="${padding.left}" x2="${width - padding.right}" y1="${y}" y2="${y}" stroke="#e7cfa7" stroke-dasharray="4 6" />`
+        })
+        .join('')}
+      ${tickIndices
+        .map((index) => {
+          const x =
+            padding.left +
+            (days.length <= 1 ? chartWidth / 2 : (index / (days.length - 1)) * chartWidth)
+          const label = days[index]
+          return `
+            <line x1="${x}" x2="${x}" y1="${padding.top}" y2="${height - padding.bottom}" stroke="#f0d9b5" stroke-dasharray="4 8" />
+            <text x="${x}" y="${height - 14}" text-anchor="middle" fill="#7a4e2d" font-size="10">${escapeHtml(label.label)}</text>
+          `
+        })
+        .join('')}
+      ${segments
+        .map(
+          (segment) =>
+            `<path d="${segmentPath(segment)}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />`,
+        )
+        .join('')}
+      ${pointPositions
+        .map((point) => {
+          if (point.y === null) return ''
+          return `
+            ${point.hasPhoto ? `<text x="${point.x}" y="${point.y - 12}" text-anchor="middle" fill="#2c1c12" font-size="12">📷</text>` : ''}
+            <circle cx="${point.x}" cy="${point.y}" r="6" fill="#fff" stroke="${color}" stroke-width="3" />
+            <circle cx="${point.x}" cy="${point.y}" r="3" fill="${color}" />
+          `
+        })
+        .join('')}
+      ${points.some((point) => typeof point.value === 'number')
+        ? ''
+        : `<text x="${width / 2}" y="${height / 2}" text-anchor="middle" fill="#b7791f" font-size="14">Geen data in dit bereik</text>`}
+      <text x="14" y="34" fill="#7a4e2d" font-size="10" text-transform="uppercase">${escapeHtml(valueLabels[valueLabels.length - 1])}</text>
+      <text x="14" y="${height - 48}" fill="#7a4e2d" font-size="10" text-transform="uppercase">${escapeHtml(valueLabels[0])}</text>
+    </svg>
+  `
+}
+
+const buildPrintReportHtml = ({ analyticsPeriodLabel, analyticsTotals, analyticsDogs, analyticsDays }) => {
+  const chartBoxStyle =
+    'border:1px solid #e7cfa7;border-radius:24px;background:#fcf7ed;padding:14px;overflow:hidden;'
+  const cardStyle =
+    'border:1px solid #e7cfa7;border-radius:24px;background:#fff;padding:14px;'
+  const dogCardStyle =
+    'border:1px solid #e7cfa7;border-radius:28px;background:#fff;padding:18px;page-break-inside:avoid;break-inside:avoid;'
+  const photoGridStyle =
+    'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;'
+  const summaryCards = [
+    ['Logs', analyticsTotals.logs],
+    ['Poep', analyticsTotals.poop],
+    ['Welzijn', analyticsTotals.wellbeing],
+    ['Foto\'s', analyticsTotals.photos],
+  ]
+
+  return `<!doctype html>
+  <html lang="nl">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Hondenlogboek export</title>
+      <style>
+        @page { size: A4; margin: 14mm; }
+        body {
+          margin: 0;
+          font-family: 'Avenir Next', Avenir, 'Trebuchet MS', 'Segoe UI', sans-serif;
+          color: #2c1c12;
+          background: #ffffff;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        h1, h2, h3, h4 {
+          font-family: 'Iowan Old Style', 'Palatino', 'Georgia', serif;
+          margin: 0;
+        }
+        .page { max-width: 980px; margin: 0 auto; padding: 0; }
+        .header {
+          border-bottom: 1px solid #e7cfa7;
+          padding-bottom: 14px;
+          margin-bottom: 18px;
+        }
+        .eyebrow { font-size: 11px; letter-spacing: .35em; text-transform: uppercase; color: #8b6a4e; }
+        .summary {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 18px;
+        }
+        .value { font-size: 30px; font-weight: 700; margin-top: 8px; }
+        .label { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: #8b6a4e; }
+        .dog { margin-top: 22px; }
+        .dog h2 { font-size: 26px; }
+        .dog-meta { font-size: 13px; color: #7a4e2d; margin-top: 6px; }
+        .chip {
+          display: inline-flex;
+          align-items: center;
+          border: 1px solid #e7cfa7;
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-size: 10px;
+          letter-spacing: .2em;
+          text-transform: uppercase;
+          color: #7a4e2d;
+          background: #fcf7ed;
+        }
+        .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+        .photos-title { margin-top: 16px; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: #8b6a4e; }
+        .photos { ${photoGridStyle} margin-top: 10px; }
+        figure { margin: 0; page-break-inside: avoid; break-inside: avoid; }
+        figure img { width: 100%; height: 84px; object-fit: cover; border-radius: 16px; display: block; }
+        figcaption { font-size: 10px; color: #7a4e2d; margin-top: 4px; line-height: 1.3; }
+        .empty { margin-top: 10px; font-size: 13px; color: #7a4e2d; }
+        .page-break { page-break-after: always; break-after: page; }
+        .chart-box { ${chartBoxStyle} }
+        .card { ${cardStyle} }
+        .dog-card { ${dogCardStyle} }
+      </style>
+    </head>
+    <body>
+      <div class="page">
+        <div class="header">
+          <div class="eyebrow">Hondenlogboek export</div>
+          <h1 style="margin-top:10px;font-size:38px;">Periode overzicht</h1>
+          <p style="margin-top:10px;font-size:14px;color:#7a4e2d;">${escapeHtml(analyticsPeriodLabel || 'Geen periode geselecteerd')}</p>
+          <div class="summary">
+            ${summaryCards
+              .map(
+                ([label, value]) => `
+                  <div class="card">
+                    <div class="label">${label}</div>
+                    <div class="value">${escapeHtml(value)}</div>
+                  </div>
+                `,
+              )
+              .join('')}
+          </div>
+        </div>
+        ${analyticsDogs
+          .map(
+            (dogSummary, index) => `
+              <section class="dog ${index < analyticsDogs.length - 1 ? 'page-break' : ''}">
+                <div class="dog-card">
+                  <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+                    <div>
+                      <h2>${escapeHtml(dogSummary.dog)}</h2>
+                      <div class="dog-meta">Logs: ${dogSummary.metrics.total} · Poep: ${dogSummary.metrics.poop} · Welzijn: ${dogSummary.metrics.wellbeing} · Training: ${dogSummary.metrics.training}</div>
+                    </div>
+                    <div class="chip-row">
+                      <span class="chip">Gem. poep: ${dogSummary.averages.poop ? dogSummary.averages.poop.toFixed(1) : '-'}</span>
+                      <span class="chip">Gem. welzijn: ${dogSummary.averages.wellbeing ? dogSummary.averages.wellbeing.toFixed(1) : '-'}</span>
+                      <span class="chip">Foto's: ${dogSummary.totalPhotos}</span>
+                    </div>
+                  </div>
+                  <div class="charts">
+                    <div class="chart-box">
+                      <div style="font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7a4e2d;margin-bottom:10px;">Poepconsistentie</div>
+                      ${buildTrendChartSvgMarkup({
+                        days: analyticsDays,
+                        points: dogSummary.poopSeries,
+                        color: DOG_LINE_COLORS[dogSummary.dog],
+                        minValue: 1,
+                        maxValue: 4,
+                        valueLabels: ['Diarree', 'Zacht', 'Anders', 'Goed'],
+                      })}
+                    </div>
+                    <div class="chart-box">
+                      <div style="font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7a4e2d;margin-bottom:10px;">Welzijn</div>
+                      ${buildTrendChartSvgMarkup({
+                        days: analyticsDays,
+                        points: dogSummary.wellbeingSeries,
+                        color: DOG_LINE_COLORS[dogSummary.dog],
+                        minValue: 1,
+                        maxValue: 3,
+                        valueLabels: ['Laag', 'Middel', 'Hoog'],
+                      })}
+                    </div>
+                  </div>
+                  <div class="photos-title">Poepfoto's</div>
+                  ${
+                    dogSummary.poopPhotos.length > 0
+                      ? `<div class="photos">
+                          ${dogSummary.poopPhotos
+                            .map(
+                              (photo) => `
+                                <figure>
+                                  <img src="${escapeHtml(photo.url)}" alt="Poepfoto" />
+                                  <figcaption>${escapeHtml(formatLongDate(photo.event.created_at))} · ${escapeHtml(formatTimeInput(photo.event.created_at))}</figcaption>
+                                </figure>
+                              `,
+                            )
+                            .join('')}
+                        </div>`
+                      : `<div class="empty">Geen poepfoto's in deze periode.</div>`
+                  }
+                </div>
+              </section>
+            `,
+          )
+          .join('')}
+      </div>
+    </body>
+  </html>`
+}
+
 const normalizePhotos = (photos, fallbackTag = '') => {
   if (!Array.isArray(photos)) return []
   return photos
@@ -249,6 +767,14 @@ function App() {
     EVENT_TYPES.map((type) => type.key),
   )
   const [calendarDogFilter, setCalendarDogFilter] = useState([...DOGS])
+  const [analyticsRange, setAnalyticsRange] = useState(() => {
+    const end = new Date()
+    const start = addDays(end, -(TREND_DAYS - 1))
+    return {
+      start: formatDateInput(start),
+      end: formatDateInput(end),
+    }
+  })
   const configMissing = !isSupabaseConfigured
 
   const upsertEvent = useCallback((record) => {
@@ -455,7 +981,114 @@ function App() {
     )
   }, [filteredEvents])
 
-  const weeklyTrends = useMemo(() => {
+  const analyticsDays = useMemo(
+    () => buildDateRangeDays(analyticsRange.start, analyticsRange.end),
+    [analyticsRange.end, analyticsRange.start],
+  )
+
+  const analyticsPeriodLabel = useMemo(() => {
+    if (!analyticsDays.length) return ''
+    return `${analyticsDays[0].full} – ${analyticsDays[analyticsDays.length - 1].full}`
+  }, [analyticsDays])
+
+  const analyticsEvents = useMemo(() => {
+    if (!analyticsDays.length) return []
+    const startKey = analyticsDays[0].key
+    const endKey = analyticsDays[analyticsDays.length - 1].key
+    return events.filter((event) => {
+      const key = getEventDateKey(event)
+      return key >= startKey && key <= endKey
+    })
+  }, [analyticsDays, events])
+
+  const analyticsDogs = useMemo(() => {
+    return DOGS.map((dog) => {
+      const dogEvents = analyticsEvents.filter((event) => event.dog === dog)
+      const poopEvents = dogEvents.filter((event) => event.type === 'poep')
+      const wellbeingEvents = dogEvents.filter((event) => event.type === 'welzijn')
+      const poopPhotos = poopEvents.flatMap((event) =>
+        normalizePhotos(event.data?.photos).map((photo) => ({
+          ...photo,
+          event,
+        })),
+      )
+      const poopSeries = analyticsDays.map((day) => {
+        const dayEvents = poopEvents.filter(
+          (event) => getEventDateKey(event) === day.key,
+        )
+        const values = dayEvents.map((event) =>
+          mapConsistencyScore(event.data?.consistency),
+        )
+        return {
+          ...day,
+          value: toAverage(values),
+          count: dayEvents.length,
+          hasPhoto: dayEvents.some(
+            (event) =>
+              Array.isArray(event.data?.photos) && event.data.photos.length > 0,
+          ),
+        }
+      })
+      const wellbeingSeries = analyticsDays.map((day) => {
+        const dayEvents = wellbeingEvents.filter(
+          (event) => getEventDateKey(event) === day.key,
+        )
+        const values = dayEvents.map((event) =>
+          mapSeverityScore(event.data?.severity),
+        )
+        return {
+          ...day,
+          value: toAverage(values),
+          count: dayEvents.length,
+          hasPhoto: dayEvents.some(
+            (event) =>
+              Array.isArray(event.data?.photos) && event.data.photos.length > 0,
+          ),
+        }
+      })
+
+      const totalPhotos = dogEvents.reduce(
+        (sum, event) => sum + normalizePhotos(event.data?.photos).length,
+        0,
+      )
+
+      return {
+        dog,
+        dogEvents,
+        poopEvents,
+        wellbeingEvents,
+        poopSeries,
+        wellbeingSeries,
+        poopPhotos,
+        totalPhotos,
+        metrics: {
+          total: dogEvents.length,
+          poop: poopEvents.length,
+          wellbeing: wellbeingEvents.length,
+          training: dogEvents.filter((event) => event.type === 'training').length,
+          meals: dogEvents.filter((event) => event.type === 'maaltijd').length,
+        },
+        averages: {
+          poop: toAverage(poopEvents.map((event) => mapConsistencyScore(event.data?.consistency))),
+          wellbeing: toAverage(
+            wellbeingEvents.map((event) => mapSeverityScore(event.data?.severity)),
+          ),
+        },
+      }
+    })
+  }, [analyticsDays, analyticsEvents])
+
+  const analyticsTotals = useMemo(() => {
+    const totalPhotos = analyticsDogs.reduce((sum, dog) => sum + dog.totalPhotos, 0)
+    return {
+      logs: analyticsEvents.length,
+      poop: analyticsEvents.filter((event) => event.type === 'poep').length,
+      wellbeing: analyticsEvents.filter((event) => event.type === 'welzijn').length,
+      photos: totalPhotos,
+    }
+  }, [analyticsDogs, analyticsEvents])
+
+  const mobileTrends = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const days = Array.from({ length: TREND_DAYS }).map((_, index) => {
@@ -486,7 +1119,7 @@ function App() {
           )
           const total = dayEvents.length
           const hasPhoto = dayEvents.some((event) =>
-            Array.isArray(event.data?.photos) && event.data.photos.length > 0
+            Array.isArray(event.data?.photos) && event.data.photos.length > 0,
           )
           return { ...day, total, hasPhoto }
         })
@@ -909,6 +1542,29 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  const exportAnalyticsReport = () => {
+    if (typeof window === 'undefined') return
+    const popup = window.open('', '_blank', 'width=1200,height=1600')
+    if (!popup) {
+      setError('Het exportvenster kon niet worden geopend. Controleer je popup-blokkering.')
+      return
+    }
+
+    popup.document.write(
+      buildPrintReportHtml({
+        analyticsPeriodLabel,
+        analyticsTotals,
+        analyticsDogs,
+        analyticsDays,
+      }),
+    )
+    popup.document.close()
+    popup.focus()
+    window.setTimeout(() => {
+      popup.print()
+    }, 300)
+  }
+
   const activeSummaryDate = formatLongDate(`${selectedDate}T12:00:00`)
   const isEdit = sheet.mode === 'edit'
   const editedTimestamp = isEdit ? buildTimestamp(sheet.date, sheet.time) : undefined
@@ -1027,7 +1683,8 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen">
+    <>
+      <div className="app-shell min-h-screen">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-28 pt-6 md:pb-16 md:pt-8">
         <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -1043,7 +1700,7 @@ function App() {
             {[
               { key: 'loggen', label: 'Loggen' },
               { key: 'tijdlijn', label: 'Tijdlijn' },
-              { key: 'week', label: 'Trends' },
+              { key: 'week', label: 'Analyse' },
               { key: 'kalender', label: 'Kalender' },
             ].map((tab) => (
               <button
@@ -1475,94 +2132,255 @@ function App() {
                 mobileTab === 'week' ? '' : 'hidden'
               } ${desktopTab === 'week' ? 'md:block' : 'md:hidden'}`}
             >
-              <div>
-                <h2 className="text-2xl font-semibold">Trends</h2>
-                <p className="mt-1 text-sm text-amber-800">
-                  Laatste 30 dagen met focus op poep en welzijn.
-                </p>
-              </div>
-              <div className="space-y-3">
-                {weeklyTrends.dogs.map((dogSummary) => (
-                  <div
-                    key={dogSummary.dog}
-                    className="rounded-3xl border border-amber-200/70 bg-white/80 p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">{dogSummary.dog}</h3>
-                      <span className="chip">30 dagen</span>
-                    </div>
-                    <div className="mt-4 space-y-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
-                          Poeptrend (incl. foto)
-                        </p>
-                        <div className="mt-3 flex items-end gap-1">
-                          {dogSummary.poop.map((day) => {
-                            const height =
-                              day.total === 0
-                                ? 2
-                                : Math.min(28, 4 + day.total * 4)
-                            const color =
-                              day.total === 0 ? 'bg-amber-200' : 'bg-stone-600'
-                            return (
-                              <div key={day.key} className="flex flex-col items-center">
-                                <div className="mb-1 h-1">
-                                  {day.hasPhoto ? (
-                                    <span className="block h-1 w-1 rounded-full bg-rose-500" />
-                                  ) : (
-                                    <span className="block h-1 w-1 opacity-0" />
-                                  )}
+              <div className="md:hidden">
+                <div>
+                  <h2 className="text-2xl font-semibold">Trends</h2>
+                  <p className="mt-1 text-sm text-amber-800">
+                    Laatste 30 dagen met focus op poep en welzijn.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {mobileTrends.dogs.map((dogSummary) => (
+                    <div
+                      key={dogSummary.dog}
+                      className="rounded-3xl border border-amber-200/70 bg-white/80 p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">{dogSummary.dog}</h3>
+                        <span className="chip">30 dagen</span>
+                      </div>
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                            Poeptrend (incl. foto)
+                          </p>
+                          <div className="mt-3 flex items-end gap-1">
+                            {dogSummary.poop.map((day) => {
+                              const height =
+                                day.total === 0
+                                  ? 2
+                                  : Math.min(28, 4 + day.total * 4)
+                              const color =
+                                day.total === 0 ? 'bg-amber-200' : 'bg-stone-600'
+                              return (
+                                <div key={day.key} className="flex flex-col items-center">
+                                  <div className="mb-1 h-1">
+                                    {day.hasPhoto ? (
+                                      <span className="block h-1 w-1 rounded-full bg-rose-500" />
+                                    ) : (
+                                      <span className="block h-1 w-1 opacity-0" />
+                                    )}
+                                  </div>
+                                  <div
+                                    className={`w-2 rounded-full ${color}`}
+                                    style={{ height }}
+                                    title={day.full}
+                                  />
                                 </div>
-                                <div
-                                  className={`w-2 rounded-full ${color}`}
-                                  style={{ height }}
-                                  title={day.full}
-                                />
-                              </div>
-                            )
-                          })}
+                              )
+                            })}
+                          </div>
+                          <div className="mt-2 flex justify-between text-[10px] text-amber-500">
+                            <span>{mobileTrends.days[0].label}</span>
+                            <span>{mobileTrends.days[mobileTrends.days.length - 1].label}</span>
+                          </div>
                         </div>
-                        <div className="mt-2 flex justify-between text-[10px] text-amber-500">
-                          <span>{weeklyTrends.days[0].label}</span>
-                          <span>{weeklyTrends.days[weeklyTrends.days.length - 1].label}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
-                          Welzijn trend
-                        </p>
-                        <div className="mt-3 flex items-end gap-1">
-                          {dogSummary.wellbeing.map((day) => {
-                            const avg = day.avg
-                            const color =
-                              avg === null
-                                ? 'bg-amber-200'
-                                : avg >= 2.6
-                                  ? WELLBEING_SEVERITY_COLORS.hoog
-                                  : avg >= 1.6
-                                    ? WELLBEING_SEVERITY_COLORS.middel
-                                    : WELLBEING_SEVERITY_COLORS.laag
-                            const height =
-                              avg === null ? 2 : Math.round(4 + avg * 6)
-                            return (
-                              <div key={day.key} className="flex flex-col items-center">
-                                <div
-                                  className={`w-2 rounded-full ${color}`}
-                                  style={{ height }}
-                                  title={day.full}
-                                />
-                              </div>
-                            )
-                          })}
-                        </div>
-                        <div className="mt-2 flex justify-between text-[10px] text-amber-500">
-                          <span>{weeklyTrends.days[0].label}</span>
-                          <span>{weeklyTrends.days[weeklyTrends.days.length - 1].label}</span>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                            Welzijn trend
+                          </p>
+                          <div className="mt-3 flex items-end gap-1">
+                            {dogSummary.wellbeing.map((day) => {
+                              const avg = day.avg
+                              const color =
+                                avg === null
+                                  ? 'bg-amber-200'
+                                  : avg >= 2.6
+                                    ? WELLBEING_SEVERITY_COLORS.hoog
+                                    : avg >= 1.6
+                                      ? WELLBEING_SEVERITY_COLORS.middel
+                                      : WELLBEING_SEVERITY_COLORS.laag
+                              const height =
+                                avg === null ? 2 : Math.round(4 + avg * 6)
+                              return (
+                                <div key={day.key} className="flex flex-col items-center">
+                                  <div
+                                    className={`w-2 rounded-full ${color}`}
+                                    style={{ height }}
+                                    title={day.full}
+                                  />
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <div className="mt-2 flex justify-between text-[10px] text-amber-500">
+                            <span>{mobileTrends.days[0].label}</span>
+                            <span>{mobileTrends.days[mobileTrends.days.length - 1].label}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="hidden space-y-5 md:block">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-semibold">Analyse</h2>
+                    <p className="mt-1 text-sm text-amber-800">
+                      Kies een periode en bekijk poep- en welzijnstrends per hond.
+                    </p>
                   </div>
-                ))}
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="flex flex-col gap-2 text-xs uppercase tracking-[0.3em] text-amber-600">
+                      Start
+                      <input
+                        className="input w-[160px]"
+                        type="date"
+                        value={analyticsRange.start}
+                        onChange={(event) =>
+                          setAnalyticsRange((prev) => ({
+                            ...prev,
+                            start: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="flex flex-col gap-2 text-xs uppercase tracking-[0.3em] text-amber-600">
+                      Eind
+                      <input
+                        className="input w-[160px]"
+                        type="date"
+                        value={analyticsRange.end}
+                        onChange={(event) =>
+                          setAnalyticsRange((prev) => ({
+                            ...prev,
+                            end: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <button className="btn btn-primary" onClick={exportAnalyticsReport}>
+                      Exporteer als PDF
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-sm text-amber-800">{analyticsPeriodLabel}</p>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-3xl border border-amber-200/70 bg-white/80 p-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-amber-600">
+                      Logs
+                    </p>
+                    <p className="mt-2 text-3xl font-semibold">{analyticsTotals.logs}</p>
+                  </div>
+                  <div className="rounded-3xl border border-amber-200/70 bg-white/80 p-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-amber-600">
+                      Poep
+                    </p>
+                    <p className="mt-2 text-3xl font-semibold">{analyticsTotals.poop}</p>
+                  </div>
+                  <div className="rounded-3xl border border-amber-200/70 bg-white/80 p-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-amber-600">
+                      Welzijn
+                    </p>
+                    <p className="mt-2 text-3xl font-semibold">
+                      {analyticsTotals.wellbeing}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-amber-200/70 bg-white/80 p-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-amber-600">
+                      Foto's
+                    </p>
+                    <p className="mt-2 text-3xl font-semibold">{analyticsTotals.photos}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  {analyticsDogs.map((dogSummary) => (
+                    <div
+                      key={dogSummary.dog}
+                      className="rounded-[2rem] border border-amber-200/70 bg-amber-50/70 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-xl font-semibold">{dogSummary.dog}</h3>
+                          <p className="mt-1 text-sm text-amber-800">
+                            Logs: {dogSummary.metrics.total} · Poep: {dogSummary.metrics.poop} ·
+                            Welzijn: {dogSummary.metrics.wellbeing}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="chip">
+                            Gem. poep: {dogSummary.averages.poop ? dogSummary.averages.poop.toFixed(1) : '-'}
+                          </span>
+                          <span className="chip">
+                            Gem. welzijn:{' '}
+                            {dogSummary.averages.wellbeing
+                              ? dogSummary.averages.wellbeing.toFixed(1)
+                              : '-'}
+                          </span>
+                          <span className="chip">Foto's: {dogSummary.totalPhotos}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                        <TrendChart
+                          title="Poepconsistentie"
+                          subtitle="Gemiddelde score per dag, met fotomarkers op dagen met poepfoto's."
+                          days={analyticsDays}
+                          points={dogSummary.poopSeries}
+                          color={DOG_LINE_COLORS[dogSummary.dog]}
+                          minValue={1}
+                          maxValue={4}
+                          valueLabels={['Diarree', 'Zacht', 'Anders', 'Goed']}
+                        />
+                        <TrendChart
+                          title="Welzijn"
+                          subtitle="Gemiddelde severity per dag."
+                          days={analyticsDays}
+                          points={dogSummary.wellbeingSeries}
+                          color={DOG_LINE_COLORS[dogSummary.dog]}
+                          minValue={1}
+                          maxValue={3}
+                          valueLabels={['Laag', 'Middel', 'Hoog']}
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                            Poepfoto's
+                          </p>
+                          <span className="chip">{dogSummary.poopPhotos.length}</span>
+                        </div>
+                        {dogSummary.poopPhotos.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {dogSummary.poopPhotos.slice(0, 12).map((photo) => (
+                              <figure key={`${photo.event.id}-${photo.url}`} className="space-y-1">
+                                <img
+                                  src={photo.url}
+                                  alt="Poepfoto"
+                                  className="h-16 w-16 rounded-2xl object-cover"
+                                  onClick={() => openPhotoPreview(photo.url)}
+                                />
+                                <figcaption className="w-16 text-[10px] text-amber-700">
+                                  {formatTimeInput(photo.event.created_at)}
+                                </figcaption>
+                              </figure>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-sm text-amber-700">
+                            Geen poepfoto's in deze periode.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
@@ -1683,7 +2501,7 @@ function App() {
                             setCalendarDate(date)
                             setCalendarView('day')
                           }}
-                          className={`min-h-[120px] rounded-2xl border border-amber-100/80 p-2 text-left ${
+                          className={`min-h-[136px] rounded-2xl border border-amber-100/80 p-2 text-left ${
                             isCurrentMonth
                               ? 'bg-white/90'
                               : 'bg-amber-50/70 text-amber-400'
@@ -1723,13 +2541,13 @@ function App() {
                             ))}
                           </div>
                           {photos.length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1">
+                            <div className="mt-2 grid grid-cols-3 gap-1">
                               {photos.slice(0, 3).map((photo) => (
                                 <img
                                   key={photo.url}
                                   src={photo.url}
                                   alt="Dag foto"
-                                  className="h-8 w-8 rounded-lg object-cover"
+                                  className="h-10 w-10 rounded-lg object-cover"
                                 />
                               ))}
                             </div>
@@ -2703,7 +3521,8 @@ function App() {
           </div>
         ))}
       </div>
-    </div>
+      </div>
+      </>
   )
 }
 
